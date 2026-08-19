@@ -5,6 +5,15 @@
 
 
 /* =====================================================
+   CHART INSTANCE
+===================================================== */
+
+let planningChartInstance = null;
+let durasiChartInstance = null;
+let karyawanChartInstance = null;
+
+
+/* =====================================================
    NAVIGASI
 ===================================================== */
 
@@ -25,7 +34,9 @@ function showPage(pageId, button = null) {
     });
 
     if (button) {
+
         button.classList.add("active");
+
     } else {
 
         const menu = document.querySelector(
@@ -36,11 +47,6 @@ function showPage(pageId, button = null) {
             menu.classList.add("active");
         }
     }
-
-
-    /* =================================================
-       JUDUL HALAMAN
-    ================================================= */
 
     const titles = {
 
@@ -61,7 +67,6 @@ function showPage(pageId, button = null) {
 
     };
 
-
     const title = document.getElementById("pageTitle");
     const subtitle = document.getElementById("pageSubtitle");
 
@@ -77,17 +82,13 @@ function showPage(pageId, button = null) {
 
     }
 
-
-    /* =================================================
-       LOAD HALAMAN
-    ================================================= */
+    /* LOAD HALAMAN */
 
     if (pageId === "dashboard") {
 
         updateDashboard();
 
     }
-
 
     if (pageId === "karyawan") {
 
@@ -97,7 +98,6 @@ function showPage(pageId, button = null) {
 
     }
 
-
     if (pageId === "planning") {
 
         if (typeof updateKaryawanDropdown === "function") {
@@ -106,8 +106,7 @@ function showPage(pageId, button = null) {
 
         if (typeof renderPlanningKaryawan === "function") {
 
-            const modal =
-                document.getElementById("planningModal");
+            const modal = document.getElementById("planningModal");
 
             if (
                 modal &&
@@ -116,29 +115,37 @@ function showPage(pageId, button = null) {
                     modal.style.display === "flex"
                 )
             ) {
-
                 renderPlanningKaryawan();
-
             }
-
         }
 
         if (typeof renderPlanning === "function") {
             renderPlanning();
         }
-
     }
-
 }
 
 
 /* =====================================================
-   CHART INSTANCE
+   DATA HELPER
 ===================================================== */
 
-let planningChartInstance = null;
-let durasiChartInstance = null;
-let karyawanChartInstance = null;
+function getPlanningData() {
+
+    return Array.isArray(window.planning)
+        ? window.planning
+        : [];
+
+}
+
+
+function getJumlahKaryawanPlanning(item) {
+
+    return Array.isArray(item.karyawan)
+        ? item.karyawan.length
+        : Number(item.jumlahKaryawan || 0);
+
+}
 
 
 /* =====================================================
@@ -160,60 +167,41 @@ function updateDashboard() {
 
 function updateDashboardStats() {
 
-    const dataPlanning =
-        Array.isArray(window.planning)
-            ? window.planning
-            : [];
+    const dataPlanning = getPlanningData();
 
-
-    /* =================================================
-       TOTAL KARYAWAN
-    ================================================= */
+    /* TOTAL KARYAWAN */
 
     let totalKaryawan = 0;
 
     if (typeof getKaryawanAktif === "function") {
 
-        totalKaryawan =
-            getKaryawanAktif().length;
+        totalKaryawan = getKaryawanAktif().length;
 
     } else if (Array.isArray(window.karyawan)) {
 
-        totalKaryawan =
-            window.karyawan.length;
+        totalKaryawan = window.karyawan.length;
 
     }
-
 
     const elTotalKaryawan =
         document.getElementById("totalKaryawan");
 
     if (elTotalKaryawan) {
-        elTotalKaryawan.textContent =
-            totalKaryawan;
+        elTotalKaryawan.textContent = totalKaryawan;
     }
 
 
-    /* =================================================
-       TOTAL PLANNING
-    ================================================= */
-
-    const totalPlanning =
-        dataPlanning.length;
+    /* TOTAL PLANNING */
 
     const elTotalPlanning =
         document.getElementById("totalPlanning");
 
     if (elTotalPlanning) {
-        elTotalPlanning.textContent =
-            totalPlanning;
+        elTotalPlanning.textContent = dataPlanning.length;
     }
 
 
-    /* =================================================
-       TOTAL JAM
-       DURASI × JUMLAH KARYAWAN
-    ================================================= */
+    /* TOTAL JAM */
 
     let totalJam = 0;
 
@@ -223,18 +211,12 @@ function updateDashboardStats() {
             Number(item.durasiMenit || 0);
 
         const jumlahKaryawan =
-            Array.isArray(item.karyawan)
-                ? item.karyawan.length
-                : Number(item.jumlahKaryawan || 0);
+            getJumlahKaryawanPlanning(item);
 
         totalJam +=
-            (
-                durasiMenit *
-                jumlahKaryawan
-            ) / 60;
+            (durasiMenit * jumlahKaryawan) / 60;
 
     });
-
 
     const elTotalJam =
         document.getElementById("totalJam");
@@ -249,9 +231,7 @@ function updateDashboardStats() {
     }
 
 
-    /* =================================================
-       PLANNING HARI INI
-    ================================================= */
+    /* PLANNING HARI INI */
 
     const now = new Date();
 
@@ -263,43 +243,32 @@ function updateDashboardStats() {
         .toISOString()
         .split("T")[0];
 
-
     const planningHariIni =
-        dataPlanning.filter(item => {
-
-            return String(item.tanggal || "") === today;
-
-        }).length;
-
+        dataPlanning.filter(
+            item => String(item.tanggal || "") === today
+        ).length;
 
     const elHariIni =
         document.getElementById("planningHariIni");
 
     if (elHariIni) {
-        elHariIni.textContent =
-            planningHariIni;
+        elHariIni.textContent = planningHariIni;
     }
 
 
-    /* =================================================
-       DURASI 4 / 8 / 12 JAM
-    ================================================= */
+    /* DURASI 4 / 8 / 12 JAM */
 
     let count4 = 0;
     let count8 = 0;
     let count12 = 0;
 
-
     dataPlanning.forEach(item => {
 
         const jumlah =
-            Array.isArray(item.karyawan)
-                ? item.karyawan.length
-                : Number(item.jumlahKaryawan || 0);
+            getJumlahKaryawanPlanning(item);
 
         const menit =
             Number(item.durasiMenit || 0);
-
 
         if (menit === 240) {
 
@@ -317,16 +286,9 @@ function updateDashboardStats() {
 
     });
 
-
-    const el4 =
-        document.getElementById("count4Jam");
-
-    const el8 =
-        document.getElementById("count8Jam");
-
-    const el12 =
-        document.getElementById("count12Jam");
-
+    const el4 = document.getElementById("count4Jam");
+    const el8 = document.getElementById("count8Jam");
+    const el12 = document.getElementById("count12Jam");
 
     if (el4) {
         el4.textContent = count4;
@@ -351,18 +313,14 @@ function updateDashboardCharts() {
 
     if (typeof Chart === "undefined") {
 
-        console.warn(
-            "Chart.js belum termuat."
-        );
+        console.warn("Chart.js belum termuat.");
 
         return;
     }
-
 
     if (!Array.isArray(window.planning)) {
         return;
     }
-
 
     renderPlanningChart();
     renderDurasiChart();
@@ -380,17 +338,11 @@ function renderPlanningChart() {
     const canvas =
         document.getElementById("planningChart");
 
-    if (!canvas) {
+    if (!canvas || typeof Chart === "undefined") {
         return;
     }
-
-    if (typeof Chart === "undefined") {
-        return;
-    }
-
 
     const dataTanggal = {};
-
 
     window.planning.forEach(item => {
 
@@ -401,46 +353,28 @@ function renderPlanningChart() {
             return;
         }
 
-
         const jumlah =
-            Array.isArray(item.karyawan)
-                ? item.karyawan.length
-                : Number(item.jumlahKaryawan || 0);
-
+            getJumlahKaryawanPlanning(item);
 
         dataTanggal[tanggal] =
-            (dataTanggal[tanggal] || 0) +
-            jumlah;
+            (dataTanggal[tanggal] || 0) + jumlah;
 
     });
-
 
     const tanggalList =
         Object.keys(dataTanggal).sort();
 
-
     const labelTanggal =
         tanggalList.map(tanggal => {
 
-            if (
-                typeof formatTanggalPlanning ===
-                "function"
-            ) {
-
-                return formatTanggalPlanning(tanggal);
-
-            }
-
-            return tanggal;
+            return typeof formatTanggalPlanning === "function"
+                ? formatTanggalPlanning(tanggal)
+                : tanggal;
 
         });
-
 
     const dataJumlah =
-        tanggalList.map(tanggal => {
-            return dataTanggal[tanggal];
-        });
-
+        tanggalList.map(tanggal => dataTanggal[tanggal]);
 
     if (planningChartInstance) {
 
@@ -448,7 +382,6 @@ function renderPlanningChart() {
         planningChartInstance = null;
 
     }
-
 
     planningChartInstance =
         new Chart(canvas, {
@@ -459,60 +392,37 @@ function renderPlanningChart() {
 
                 labels: labelTanggal,
 
-                datasets: [
+                datasets: [{
 
-                    {
+                    label: "Mand Power",
+                    data: dataJumlah,
+                    borderColor: "#d71920",
+                    backgroundColor: "rgba(215,25,32,0.10)",
+                    borderWidth: 2.5,
+                    tension: 0.35,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
 
-                        label: "Mand Power",
-
-                        data: dataJumlah,
-
-                        borderColor: "#d71920",
-
-                        backgroundColor:
-                            "rgba(215,25,32,0.10)",
-
-                        borderWidth: 2.5,
-
-                        tension: 0.35,
-
-                        fill: true,
-
-                        pointRadius: 4,
-
-                        pointHoverRadius: 6
-
-                    }
-
-                ]
+                }]
 
             },
-
 
             options: {
 
                 responsive: true,
-
                 maintainAspectRatio: false,
 
-
                 interaction: {
-
                     intersect: false,
-
                     mode: "index"
-
                 },
-
 
                 plugins: {
 
                     legend: {
-
                         display: true
-
                     },
-
 
                     tooltip: {
 
@@ -520,11 +430,7 @@ function renderPlanningChart() {
 
                             label: function(context) {
 
-                                return (
-                                    " " +
-                                    context.parsed.y +
-                                    " Mand Power"
-                                );
+                                return ` ${context.parsed.y} Mand Power`;
 
                             }
 
@@ -534,7 +440,6 @@ function renderPlanningChart() {
 
                 },
 
-
                 scales: {
 
                     y: {
@@ -542,34 +447,27 @@ function renderPlanningChart() {
                         beginAtZero: true,
 
                         ticks: {
-
                             precision: 0
-
                         },
 
                         title: {
 
                             display: true,
-
                             text: "Jumlah Karyawan"
 
                         }
 
                     },
 
-
                     x: {
 
                         grid: {
-
                             display: false
-
                         },
 
                         title: {
 
                             display: true,
-
                             text: "Tanggal"
 
                         }
@@ -594,19 +492,13 @@ function renderDurasiChart() {
     const canvas =
         document.getElementById("durasiChart");
 
-    if (!canvas) {
+    if (!canvas || typeof Chart === "undefined") {
         return;
     }
-
-    if (typeof Chart === "undefined") {
-        return;
-    }
-
 
     let count4 = 0;
     let count8 = 0;
     let count12 = 0;
-
 
     window.planning.forEach(item => {
 
@@ -614,10 +506,7 @@ function renderDurasiChart() {
             Number(item.durasiMenit || 0);
 
         const jumlah =
-            Array.isArray(item.karyawan)
-                ? item.karyawan.length
-                : Number(item.jumlahKaryawan || 0);
-
+            getJumlahKaryawanPlanning(item);
 
         if (durasi === 240) {
 
@@ -635,7 +524,6 @@ function renderDurasiChart() {
 
     });
 
-
     if (durasiChartInstance) {
 
         durasiChartInstance.destroy();
@@ -643,12 +531,10 @@ function renderDurasiChart() {
 
     }
 
-
     durasiChartInstance =
         new Chart(canvas, {
 
             type: "doughnut",
-
 
             data: {
 
@@ -658,49 +544,37 @@ function renderDurasiChart() {
                     "12 Jam"
                 ],
 
+                datasets: [{
 
-                datasets: [
+                    data: [
+                        count4,
+                        count8,
+                        count12
+                    ],
 
-                    {
+                    backgroundColor: [
+                        "#d71920",
+                        "#f59e0b",
+                        "#374151"
+                    ],
 
-                        data: [
-                            count4,
-                            count8,
-                            count12
-                        ],
+                    borderWidth: 0
 
-                        backgroundColor: [
-                            "#d71920",
-                            "#f59e0b",
-                            "#374151"
-                        ],
-
-                        borderWidth: 0
-
-                    }
-
-                ]
+                }]
 
             },
-
 
             options: {
 
                 responsive: true,
-
                 maintainAspectRatio: false,
-
                 cutout: "68%",
-
 
                 plugins: {
 
                     legend: {
-
                         position: "bottom"
-
                     },
-
 
                     tooltip: {
 
@@ -710,8 +584,7 @@ function renderDurasiChart() {
 
                                 const total =
                                     context.dataset.data.reduce(
-                                        (a, b) =>
-                                            a + b,
+                                        (a, b) => a + b,
                                         0
                                     );
 
@@ -727,15 +600,9 @@ function renderDurasiChart() {
                                         ).toFixed(1)
                                         : 0;
 
-
                                 return (
-                                    " " +
-                                    context.label +
-                                    ": " +
-                                    value +
-                                    " (" +
-                                    percentage +
-                                    "%)"
+                                    ` ${context.label}: ` +
+                                    `${value} (${percentage}%)`
                                 );
 
                             }
@@ -762,24 +629,17 @@ function renderKaryawanChart() {
     const canvas =
         document.getElementById("karyawanChart");
 
-    if (!canvas) {
+    if (!canvas || typeof Chart === "undefined") {
         return;
     }
-
-    if (typeof Chart === "undefined") {
-        return;
-    }
-
 
     const jumlahKaryawan = {};
-
 
     window.planning.forEach(item => {
 
         if (!Array.isArray(item.karyawan)) {
             return;
         }
-
 
         item.karyawan.forEach(dataKaryawan => {
 
@@ -793,7 +653,6 @@ function renderKaryawanChart() {
                     ""
                 ).trim();
 
-
             const nama =
                 String(
                     dataKaryawan.nama ||
@@ -802,24 +661,18 @@ function renderKaryawanChart() {
                     id
                 ).trim();
 
-
             if (!id) {
                 return;
             }
 
-
             if (!jumlahKaryawan[id]) {
 
                 jumlahKaryawan[id] = {
-
                     nama: nama,
-
                     jumlah: 0
-
                 };
 
             }
-
 
             jumlahKaryawan[id].jumlah++;
 
@@ -827,24 +680,16 @@ function renderKaryawanChart() {
 
     });
 
-
     const ranking =
         Object.values(jumlahKaryawan)
-            .sort(
-                (a, b) =>
-                    b.jumlah -
-                    a.jumlah
-            )
+            .sort((a, b) => b.jumlah - a.jumlah)
             .slice(0, 10);
-
 
     const labels =
         ranking.map(item => item.nama);
 
-
     const values =
         ranking.map(item => item.jumlah);
-
 
     if (karyawanChartInstance) {
 
@@ -853,56 +698,38 @@ function renderKaryawanChart() {
 
     }
 
-
     karyawanChartInstance =
         new Chart(canvas, {
 
             type: "bar",
 
-
             data: {
 
                 labels: labels,
 
+                datasets: [{
 
-                datasets: [
+                    label: "Jumlah Planning",
+                    data: values,
+                    backgroundColor: "#d71920",
+                    borderRadius: 6,
+                    borderSkipped: false
 
-                    {
-
-                        label: "Jumlah Planning",
-
-                        data: values,
-
-                        backgroundColor: "#d71920",
-
-                        borderRadius: 6,
-
-                        borderSkipped: false
-
-                    }
-
-                ]
+                }]
 
             },
-
 
             options: {
 
                 indexAxis: "y",
-
                 responsive: true,
-
                 maintainAspectRatio: false,
-
 
                 plugins: {
 
                     legend: {
-
                         display: false
-
                     },
-
 
                     tooltip: {
 
@@ -910,11 +737,7 @@ function renderKaryawanChart() {
 
                             label: function(context) {
 
-                                return (
-                                    " " +
-                                    context.parsed.x +
-                                    " planning"
-                                );
+                                return ` ${context.parsed.x} planning`;
 
                             }
 
@@ -924,7 +747,6 @@ function renderKaryawanChart() {
 
                 },
 
-
                 scales: {
 
                     x: {
@@ -932,28 +754,22 @@ function renderKaryawanChart() {
                         beginAtZero: true,
 
                         ticks: {
-
                             precision: 0
-
                         },
 
                         title: {
 
                             display: true,
-
                             text: "Jumlah Planning"
 
                         }
 
                     },
 
-
                     y: {
 
                         grid: {
-
                             display: false
-
                         }
 
                     }
@@ -974,28 +790,20 @@ function renderKaryawanChart() {
 function tampilkanTanggal() {
 
     const element =
-        document.getElementById(
-            "tanggalSekarang"
-        );
+        document.getElementById("tanggalSekarang");
 
     if (!element) {
         return;
     }
 
-
     element.textContent =
         new Date().toLocaleDateString(
             "id-ID",
             {
-
                 weekday: "long",
-
                 day: "numeric",
-
                 month: "long",
-
                 year: "numeric"
-
             }
         );
 
@@ -1008,23 +816,12 @@ function tampilkanTanggal() {
 
 function closeAllModals() {
 
-    if (
-        typeof closePenaltyModal ===
-        "function"
-    ) {
-
+    if (typeof closePenaltyModal === "function") {
         closePenaltyModal();
-
     }
 
-
-    if (
-        typeof closePlanningModal ===
-        "function"
-    ) {
-
+    if (typeof closePlanningModal === "function") {
         closePlanningModal();
-
     }
 
 }
@@ -1037,46 +834,28 @@ function closeAllModals() {
 function renderDashboardPlanning() {
 
     const tbody =
-        document.getElementById(
-            "dashboardPlanning"
-        );
-
+        document.getElementById("dashboardPlanning");
 
     if (!tbody) {
         return;
     }
 
-
     tbody.innerHTML = "";
 
-
-    const dataPlanning =
-        Array.isArray(window.planning)
-            ? window.planning
-            : [];
-
+    const dataPlanning = getPlanningData();
 
     if (dataPlanning.length === 0) {
 
         tbody.innerHTML = `
-
             <tr>
-
-                <td
-                    colspan="5"
-                    style="text-align:center;"
-                >
+                <td colspan="5" style="text-align:center;">
                     Belum ada planning
                 </td>
-
             </tr>
-
         `;
 
         return;
-
     }
-
 
     const data =
         [...dataPlanning]
@@ -1101,64 +880,38 @@ function renderDashboardPlanning() {
             })
             .slice(0, 5);
 
-
     data.forEach(item => {
 
         const jumlah =
-            Array.isArray(item.karyawan)
-                ? item.karyawan.length
-                : Number(item.jumlahKaryawan || 0);
-
+            getJumlahKaryawanPlanning(item);
 
         const tanggal =
-            typeof formatTanggalPlanning ===
-            "function"
-
-                ? formatTanggalPlanning(
-                    item.tanggal
-                )
-
+            typeof formatTanggalPlanning === "function"
+                ? formatTanggalPlanning(item.tanggal)
                 : item.tanggal || "-";
-
 
         const durasi =
             item.durasi ||
-
             (
-                typeof formatDurasiPlanning ===
-                "function"
-
-                    ? formatDurasiPlanning(
-                        item.durasiMenit
-                    )
-
+                typeof formatDurasiPlanning === "function"
+                    ? formatDurasiPlanning(item.durasiMenit)
                     : "-"
             );
-
 
         const idPlanning =
             item.idPlanning ||
             item.id ||
             "-";
 
-
         const tr =
             document.createElement("tr");
 
-
         tr.innerHTML = `
+            <td>${escapePlanningHTML(tanggal)}</td>
 
-            <td>
-                ${escapePlanningHTML(tanggal)}
-            </td>
+            <td>${escapePlanningHTML(idPlanning)}</td>
 
-            <td>
-                ${escapePlanningHTML(idPlanning)}
-            </td>
-
-            <td>
-                ${jumlah}
-            </td>
+            <td>${jumlah}</td>
 
             <td>
                 ${escapePlanningHTML(
@@ -1166,16 +919,94 @@ function renderDashboardPlanning() {
                 )}
             </td>
 
-            <td>
-                ${escapePlanningHTML(durasi)}
-            </td>
-
+            <td>${escapePlanningHTML(durasi)}</td>
         `;
-
 
         tbody.appendChild(tr);
 
     });
+
+}
+
+
+/* =====================================================
+   SETUP FORM KARYAWAN
+===================================================== */
+
+function setupFormKaryawan() {
+
+    const form =
+        document.getElementById("formKaryawan");
+
+    if (!form || form.dataset.appListener) {
+        return;
+    }
+
+    form.addEventListener("submit", function(event) {
+
+        event.preventDefault();
+
+        if (typeof tambahKaryawan === "function") {
+            tambahKaryawan();
+        }
+
+    });
+
+    form.dataset.appListener = "true";
+
+}
+
+
+/* =====================================================
+   SETUP BACKDROP MODAL
+===================================================== */
+
+function setupModalBackdrop(modalId, closeFunction) {
+
+    const modal =
+        document.getElementById(modalId);
+
+    if (!modal || modal.dataset.backdropListener) {
+        return;
+    }
+
+    modal.addEventListener("click", function(event) {
+
+        if (event.target !== modal) {
+            return;
+        }
+
+        if (typeof closeFunction === "function") {
+            closeFunction();
+        }
+
+    });
+
+    modal.dataset.backdropListener = "true";
+
+}
+
+
+/* =====================================================
+   INITIAL DATA
+===================================================== */
+
+function loadInitialData() {
+
+    if (typeof updateKaryawanDropdown === "function") {
+        updateKaryawanDropdown();
+    }
+
+    if (typeof renderKaryawan === "function") {
+        renderKaryawan();
+    }
+
+    if (typeof renderPlanning === "function") {
+        renderPlanning();
+    }
+
+    updateDashboard();
+    tampilkanTanggal();
 
 }
 
@@ -1188,204 +1019,41 @@ document.addEventListener(
     "DOMContentLoaded",
     function() {
 
+        setupFormKaryawan();
 
-        /* ==============================================
-           FORM KARYAWAN
-        ============================================== */
+        loadInitialData();
 
-        const formKaryawan =
-            document.getElementById(
-                "formKaryawan"
-            );
+        setupModalBackdrop(
+            "planningModal",
+            typeof closePlanningModal === "function"
+                ? closePlanningModal
+                : null
+        );
 
-
-        if (
-            formKaryawan &&
-            !formKaryawan.dataset.appListener
-        ) {
-
-            formKaryawan.addEventListener(
-                "submit",
-                function(event) {
-
-                    event.preventDefault();
+        setupModalBackdrop(
+            "penaltyModal",
+            typeof closePenaltyModal === "function"
+                ? closePenaltyModal
+                : null
+        );
 
 
-                    if (
-                        typeof tambahKaryawan ===
-                        "function"
-                    ) {
+        /* ESC = CLOSE MODAL */
 
-                        tambahKaryawan();
-
-                    }
-
-                }
-            );
-
-
-            formKaryawan.dataset.appListener =
-                "true";
-
-        }
-
-
-        /* ==============================================
-           INITIAL DATA
-        ============================================== */
-
-        if (
-            typeof updateKaryawanDropdown ===
-            "function"
-        ) {
-
-            updateKaryawanDropdown();
-
-        }
-
-
-        if (
-            typeof renderKaryawan ===
-            "function"
-        ) {
-
-            renderKaryawan();
-
-        }
-
-
-        if (
-            typeof renderPlanning ===
-            "function"
-        ) {
-
-            renderPlanning();
-
-        }
-
-
-        updateDashboard();
-
-        tampilkanTanggal();
-
-
-        /* ==============================================
-           BACKDROP PLANNING
-        ============================================== */
-
-        const planningModal =
-            document.getElementById(
-                "planningModal"
-            );
-
-
-        if (
-            planningModal &&
-            !planningModal.dataset.backdropListener
-        ) {
-
-            planningModal.addEventListener(
-                "click",
-                function(event) {
-
-                    if (
-                        event.target ===
-                        planningModal
-                    ) {
-
-                        if (
-                            typeof closePlanningModal ===
-                            "function"
-                        ) {
-
-                            closePlanningModal();
-
-                        }
-
-                    }
-
-                }
-            );
-
-
-            planningModal.dataset.backdropListener =
-                "true";
-
-        }
-
-
-        /* ==============================================
-           BACKDROP PENALTI
-        ============================================== */
-
-        const penaltyModal =
-            document.getElementById(
-                "penaltyModal"
-            );
-
-
-        if (
-            penaltyModal &&
-            !penaltyModal.dataset.backdropListener
-        ) {
-
-            penaltyModal.addEventListener(
-                "click",
-                function(event) {
-
-                    if (
-                        event.target ===
-                        penaltyModal
-                    ) {
-
-                        if (
-                            typeof closePenaltyModal ===
-                            "function"
-                        ) {
-
-                            closePenaltyModal();
-
-                        }
-
-                    }
-
-                }
-            );
-
-
-            penaltyModal.dataset.backdropListener =
-                "true";
-
-        }
-
-
-        /* ==============================================
-           ESC = CLOSE MODAL
-        ============================================== */
-
-        if (
-            !document.body.dataset.escapeListener
-        ) {
+        if (!document.body.dataset.escapeListener) {
 
             document.addEventListener(
                 "keydown",
                 function(event) {
 
-                    if (
-                        event.key ===
-                        "Escape"
-                    ) {
-
+                    if (event.key === "Escape") {
                         closeAllModals();
-
                     }
 
                 }
             );
 
-
-            document.body.dataset.escapeListener =
-                "true";
+            document.body.dataset.escapeListener = "true";
 
         }
 
@@ -1401,35 +1069,17 @@ document.addEventListener(
     "databaseReady",
     function() {
 
-        if (
-            typeof updateKaryawanDropdown ===
-            "function"
-        ) {
-
+        if (typeof updateKaryawanDropdown === "function") {
             updateKaryawanDropdown();
-
         }
 
-
-        if (
-            typeof renderKaryawan ===
-            "function"
-        ) {
-
+        if (typeof renderKaryawan === "function") {
             renderKaryawan();
-
         }
 
-
-        if (
-            typeof renderPlanning ===
-            "function"
-        ) {
-
+        if (typeof renderPlanning === "function") {
             renderPlanning();
-
         }
-
 
         updateDashboard();
 
