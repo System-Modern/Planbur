@@ -2,6 +2,7 @@
    KARYAWAN.JS
    DATABASE KARYAWAN
    TERHUBUNG DENGAN DATABASE.JS / SUPABASE
+   VERSI OPTIMASI
 ===================================================== */
 
 
@@ -15,7 +16,7 @@ function getDataKaryawan() {
         return window.karyawan;
     }
 
-    if (Array.isArray(karyawan)) {
+    if (typeof karyawan !== "undefined" && Array.isArray(karyawan)) {
         return karyawan;
     }
 
@@ -30,7 +31,7 @@ function getDataPlanning() {
         return window.planning;
     }
 
-    if (Array.isArray(planning)) {
+    if (typeof planning !== "undefined" && Array.isArray(planning)) {
         return planning;
     }
 
@@ -70,9 +71,7 @@ async function tambahKaryawan() {
 
     if (!id || !nama) {
 
-        alert(
-            "ID dan nama karyawan wajib diisi."
-        );
+        alert("ID dan nama karyawan wajib diisi.");
 
         return;
 
@@ -94,16 +93,14 @@ async function tambahKaryawan() {
 
     if (sudahAda) {
 
-        alert(
-            "ID karyawan sudah terdaftar."
-        );
+        alert("ID karyawan sudah terdaftar.");
 
         return;
 
     }
 
 
-    dataKaryawan.push({
+    const dataBaru = {
 
         id: id,
 
@@ -113,35 +110,55 @@ async function tambahKaryawan() {
 
         alasanPenalti: ""
 
-    });
+    };
 
 
     /*
-       Pastikan global tetap menunjuk
-       ke array yang sama
+       Simpan perubahan lokal terlebih dahulu
     */
 
-    window.karyawan =
-        dataKaryawan;
+    dataKaryawan.push(dataBaru);
 
+    window.karyawan = dataKaryawan;
+
+
+    /*
+       Simpan ke Supabase
+    */
 
     const berhasil =
         await simpanData();
 
 
+    /*
+       Jika gagal, rollback
+    */
+
     if (!berhasil) {
 
         dataKaryawan.pop();
+
+        window.karyawan = dataKaryawan;
+
+        renderKaryawan();
 
         return;
 
     }
 
 
+    /*
+       Bersihkan form
+    */
+
     idInput.value = "";
 
     namaInput.value = "";
 
+
+    /*
+       Update tampilan
+    */
 
     renderKaryawan();
 
@@ -168,9 +185,7 @@ async function tambahKaryawan() {
     }
 
 
-    alert(
-        "Karyawan berhasil ditambahkan."
-    );
+    alert("Karyawan berhasil ditambahkan.");
 
 }
 
@@ -200,6 +215,10 @@ async function hapusKaryawan(index) {
             .toUpperCase();
 
 
+    /*
+       Cek apakah sudah digunakan planning
+    */
+
     const dataPlanning =
         getDataPlanning();
 
@@ -208,9 +227,7 @@ async function hapusKaryawan(index) {
         dataPlanning.some(
             item =>
 
-                Array.isArray(
-                    item.karyawan
-                ) &&
+                Array.isArray(item.karyawan) &&
 
                 item.karyawan.some(
                     k =>
@@ -244,25 +261,35 @@ async function hapusKaryawan(index) {
     }
 
 
-    const dataLama =
-        {
-            ...data
-        };
+    /*
+       Simpan data lama untuk rollback
+    */
+
+    const dataLama = {
+        ...data
+    };
 
 
-    dataKaryawan.splice(
-        index,
-        1
-    );
+    /*
+       Hapus dari array lokal
+    */
+
+    dataKaryawan.splice(index, 1);
+
+    window.karyawan = dataKaryawan;
 
 
-    window.karyawan =
-        dataKaryawan;
-
+    /*
+       Simpan ke database
+    */
 
     const berhasil =
         await simpanData();
 
+
+    /*
+       Jika gagal rollback
+    */
 
     if (!berhasil) {
 
@@ -282,6 +309,10 @@ async function hapusKaryawan(index) {
 
     }
 
+
+    /*
+       Update tampilan
+    */
 
     renderKaryawan();
 
@@ -348,9 +379,6 @@ function renderKaryawan() {
                 .toLowerCase()
                 .trim()
             : "";
-
-
-    tbody.innerHTML = "";
 
 
     /*
@@ -446,6 +474,15 @@ function renderKaryawan() {
 
     else {
 
+        /*
+           OPTIMASI:
+           Buat seluruh HTML terlebih dahulu.
+           Setelah selesai baru masukkan ke DOM sekali.
+        */
+
+        let html = "";
+
+
         filtered.forEach(
             item => {
 
@@ -480,6 +517,10 @@ function renderKaryawan() {
 
                 let aksiHTML;
 
+
+                /*
+                   STATUS PENALTI
+                */
 
                 if (isPenalty) {
 
@@ -524,6 +565,10 @@ function renderKaryawan() {
                     `;
 
                 }
+
+                /*
+                   STATUS AKTIF
+                */
 
                 else {
 
@@ -570,7 +615,11 @@ function renderKaryawan() {
                 }
 
 
-                tbody.innerHTML += `
+                /*
+                   Tambahkan ke string HTML
+                */
+
+                html += `
 
                     <tr>
 
@@ -621,8 +670,19 @@ function renderKaryawan() {
             }
         );
 
+
+        /*
+           DOM hanya diubah SATU KALI
+        */
+
+        tbody.innerHTML = html;
+
     }
 
+
+    /*
+       Jumlah karyawan
+    */
 
     const jumlah =
         document.getElementById(
@@ -770,10 +830,7 @@ function bukaModalPenalti(index) {
     }
 
 
-    modal.classList.add(
-        "show"
-    );
-
+    modal.classList.add("show");
 
     modal.style.display =
         "flex";
@@ -812,10 +869,7 @@ function closePenaltyModal() {
     }
 
 
-    modal.classList.remove(
-        "show"
-    );
-
+    modal.classList.remove("show");
 
     modal.style.display =
         "none";
@@ -972,6 +1026,10 @@ async function aktifkanPenalti() {
             .alasanPenalti;
 
 
+    /*
+       Update lokal
+    */
+
     dataKaryawan[index].status =
         "PENALTI";
 
@@ -985,9 +1043,17 @@ async function aktifkanPenalti() {
         dataKaryawan;
 
 
+    /*
+       Simpan
+    */
+
     const berhasil =
         await simpanData();
 
+
+    /*
+       Rollback jika gagal
+    */
 
     if (!berhasil) {
 
@@ -999,6 +1065,11 @@ async function aktifkanPenalti() {
             .alasanPenalti =
             alasanLama;
 
+
+        window.karyawan =
+            dataKaryawan;
+
+        renderKaryawan();
 
         return;
 
@@ -1091,6 +1162,10 @@ async function lepasPenalti(index) {
         data.alasanPenalti;
 
 
+    /*
+       Update lokal
+    */
+
     data.status =
         "AKTIF";
 
@@ -1103,9 +1178,17 @@ async function lepasPenalti(index) {
         dataKaryawan;
 
 
+    /*
+       Simpan ke database
+    */
+
     const berhasil =
         await simpanData();
 
+
+    /*
+       Rollback jika gagal
+    */
 
     if (!berhasil) {
 
@@ -1117,10 +1200,19 @@ async function lepasPenalti(index) {
             alasanLama;
 
 
+        window.karyawan =
+            dataKaryawan;
+
+        renderKaryawan();
+
         return;
 
     }
 
+
+    /*
+       Update tampilan
+    */
 
     renderKaryawan();
 
@@ -1201,6 +1293,15 @@ function updateKaryawanDropdown() {
         `;
 
 
+        /*
+           Gunakan document fragment
+           supaya DOM tidak berubah berkali-kali
+        */
+
+        const fragment =
+            document.createDocumentFragment();
+
+
         dataKaryawan.forEach(
             item => {
 
@@ -1212,11 +1313,6 @@ function updateKaryawanDropdown() {
                     .trim()
                     .toUpperCase();
 
-
-                /*
-                   Karyawan penalti
-                   tidak masuk planning
-                */
 
                 if (
                     status ===
@@ -1242,11 +1338,16 @@ function updateKaryawanDropdown() {
                     `${item.id} - ${item.nama}`;
 
 
-                select.appendChild(
+                fragment.appendChild(
                     option
                 );
 
             }
+        );
+
+
+        select.appendChild(
+            fragment
         );
 
     }
@@ -1271,6 +1372,10 @@ function updateKaryawanDropdown() {
         `;
 
 
+        const fragment =
+            document.createDocumentFragment();
+
+
         dataKaryawan.forEach(
             item => {
 
@@ -1288,11 +1393,16 @@ function updateKaryawanDropdown() {
                     `${item.id} - ${item.nama}`;
 
 
-                filter.appendChild(
+                fragment.appendChild(
                     option
                 );
 
             }
+        );
+
+
+        filter.appendChild(
+            fragment
         );
 
 
@@ -1502,14 +1612,17 @@ document.addEventListener(
         }
 
 
+        /*
+           Render awal
+        */
+
         renderKaryawan();
 
         updateKaryawanDropdown();
 
 
         /*
-           Refresh dashboard
-           setelah Supabase selesai load
+           Update dashboard
         */
 
         if (
@@ -1562,5 +1675,5 @@ window.lepasPenalti =
 
 
 console.log(
-    "karyawan.js berhasil dimuat."
+    "karyawan.js berhasil dimuat - versi optimasi."
 );
