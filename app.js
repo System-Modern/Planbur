@@ -1,474 +1,1190 @@
-/* =====================================================
-   APP.JS
+/* =========================================================
+   APP.JS - OPTIMIZED + MODERN COLOR SYSTEM
+   ---------------------------------------------------------
    NAVIGASI + DASHBOARD + CHART
-===================================================== */
+   TOTAL JAM LEMBUR = DURASI × JUMLAH KARYAWAN
+
+   TEMA:
+   - Primary   : Merah LINFOX
+   - Secondary : Navy / Slate
+   - Accent    : Amber
+   - Background: Soft Gray
+   ---------------------------------------------------------
+   TIDAK MENGUBAH LOGIKA DATABASE / KARYAWAN / PLANNING
+========================================================= */
 
 
-/* =====================================================
+/* =========================================================
    CHART INSTANCE
-===================================================== */
+========================================================= */
 
 let planningChartInstance = null;
 let durasiChartInstance = null;
 let karyawanChartInstance = null;
 
 
-/* =====================================================
-   NAVIGASI
-===================================================== */
+/* =========================================================
+   STATE
+========================================================= */
 
-function showPage(pageId, button = null) {
+const AppState = {
+    initialized: false,
+    databaseReady: false,
+    dashboardInitialized: false
+};
 
-    document.querySelectorAll(".page").forEach(page => {
-        page.classList.remove("active-page");
-    });
 
-    const page = document.getElementById(pageId);
+/* =========================================================
+   COLOR SYSTEM
+========================================================= */
 
-    if (page) {
-        page.classList.add("active-page");
-    }
+const APP_COLORS = {
 
-    document.querySelectorAll(".menu-item").forEach(item => {
-        item.classList.remove("active");
-    });
+    primary: "#D71920",
+    primaryDark: "#B51218",
+    primarySoft: "#FDEBEC",
 
-    if (button) {
+    navy: "#172033",
+    navyLight: "#24324A",
 
-        button.classList.add("active");
+    slate: "#64748B",
+    slateLight: "#94A3B8",
 
-    } else {
+    amber: "#F59E0B",
+    amberSoft: "#FFF7E6",
 
-        const menu = document.querySelector(
-            `.menu-item[onclick*="'${pageId}'"]`
-        );
+    green: "#16A34A",
+    greenSoft: "#EAF8EF",
 
-        if (menu) {
-            menu.classList.add("active");
-        }
-    }
+    blue: "#2563EB",
+    blueSoft: "#EFF6FF",
 
-    const titles = {
+    purple: "#7C3AED",
+    purpleSoft: "#F5F3FF",
 
-        dashboard: [
-            "Dashboard",
-            "Ringkasan planning lembur karyawan"
-        ],
+    background: "#F6F7F9",
+    surface: "#FFFFFF",
 
-        karyawan: [
-            "Database Karyawan",
-            "Kelola data karyawan"
-        ],
+    border: "#E5E7EB",
+    text: "#172033",
+    textSoft: "#64748B",
 
-        planning: [
-            "Planning Lembur",
-            "Atur jadwal lembur karyawan"
-        ]
+    danger: "#DC2626"
 
-    };
+};
 
-    const title = document.getElementById("pageTitle");
-    const subtitle = document.getElementById("pageSubtitle");
 
-    if (titles[pageId]) {
+/* =========================================================
+   CONSTANT
+========================================================= */
 
-        if (title) {
-            title.textContent = titles[pageId][0];
-        }
+const PAGE_INFO = {
 
-        if (subtitle) {
-            subtitle.textContent = titles[pageId][1];
-        }
+    dashboard: [
+        "Dashboard",
+        "Ringkasan planning lembur karyawan"
+    ],
 
-    }
+    karyawan: [
+        "Database Karyawan",
+        "Kelola data karyawan"
+    ],
 
-    /* LOAD HALAMAN */
+    planning: [
+        "Planning Lembur",
+        "Atur jadwal lembur karyawan"
+    ]
 
-    if (pageId === "dashboard") {
+};
 
-        updateDashboard();
 
-    }
+/* =========================================================
+   DOM HELPER
+========================================================= */
 
-    if (pageId === "karyawan") {
+function appEl(id) {
 
-        if (typeof renderKaryawan === "function") {
-            renderKaryawan();
-        }
+    return document.getElementById(id);
 
-    }
-
-    if (pageId === "planning") {
-
-        if (typeof updateKaryawanDropdown === "function") {
-            updateKaryawanDropdown();
-        }
-
-        if (typeof renderPlanningKaryawan === "function") {
-
-            const modal = document.getElementById("planningModal");
-
-            if (
-                modal &&
-                (
-                    modal.classList.contains("active") ||
-                    modal.style.display === "flex"
-                )
-            ) {
-                renderPlanningKaryawan();
-            }
-        }
-
-        if (typeof renderPlanning === "function") {
-            renderPlanning();
-        }
-    }
 }
 
 
-/* =====================================================
+function setText(id, value) {
+
+    const el = appEl(id);
+
+    if (el) {
+        el.textContent = value;
+    }
+
+}
+
+
+/* =========================================================
    DATA HELPER
-===================================================== */
+========================================================= */
 
 function getPlanningData() {
 
-    return Array.isArray(window.planning)
-        ? window.planning
-        : [];
+    if (Array.isArray(window.planning)) {
+        return window.planning;
+    }
+
+    return [];
 
 }
 
+
+function getKaryawanData() {
+
+    if (Array.isArray(window.karyawan)) {
+        return window.karyawan;
+    }
+
+    return [];
+
+}
+
+
+/* =========================================================
+   DEBUG
+========================================================= */
+
+function debugAppData() {
+
+    console.log(
+        "[APP] Karyawan:",
+        getKaryawanData().length
+    );
+
+    console.log(
+        "[APP] Planning:",
+        getPlanningData().length
+    );
+
+}
+
+
+/* =========================================================
+   JUMLAH KARYAWAN DALAM PLANNING
+========================================================= */
 
 function getJumlahKaryawanPlanning(item) {
 
-    return Array.isArray(item.karyawan)
-        ? item.karyawan.length
-        : Number(item.jumlahKaryawan || 0);
+    if (!item) {
+        return 0;
+    }
+
+
+    /* ---------------------------------------------
+       FORMAT ARRAY
+    --------------------------------------------- */
+
+    if (Array.isArray(item.karyawan)) {
+        return item.karyawan.length;
+    }
+
+
+    if (Array.isArray(item.karyawanList)) {
+        return item.karyawanList.length;
+    }
+
+
+    if (Array.isArray(item.karyawan_ids)) {
+        return item.karyawan_ids.length;
+    }
+
+
+    if (Array.isArray(item.kodeKaryawanList)) {
+        return item.kodeKaryawanList.length;
+    }
+
+
+    if (Array.isArray(item.kode_karyawan_list)) {
+        return item.kode_karyawan_list.length;
+    }
+
+
+    /* ---------------------------------------------
+       FORMAT JUMLAH LANGSUNG
+    --------------------------------------------- */
+
+    if (
+        item.jumlahKaryawan !== undefined &&
+        item.jumlahKaryawan !== null
+    ) {
+
+        return Number(item.jumlahKaryawan) || 0;
+
+    }
+
+
+    if (
+        item.jumlah_karyawan !== undefined &&
+        item.jumlah_karyawan !== null
+    ) {
+
+        return Number(item.jumlah_karyawan) || 0;
+
+    }
+
+
+    return 0;
 
 }
 
 
-/* =====================================================
-   UPDATE DASHBOARD
-===================================================== */
+/* =========================================================
+   HITUNG DURASI MENIT
+========================================================= */
+
+function getDurasiMenitPlanning(item) {
+
+    if (!item) {
+        return 0;
+    }
+
+
+    /* ---------------------------------------------
+       1. DURASI MENIT LANGSUNG
+    --------------------------------------------- */
+
+    if (
+        item.durasiMenit !== undefined &&
+        item.durasiMenit !== null
+    ) {
+
+        const menit =
+            Number(item.durasiMenit);
+
+        if (
+            Number.isFinite(menit) &&
+            menit > 0
+        ) {
+
+            return menit;
+
+        }
+
+    }
+
+
+    /* ---------------------------------------------
+       2. FORMAT SUPABASE
+    --------------------------------------------- */
+
+    if (
+        item.durasi_menit !== undefined &&
+        item.durasi_menit !== null
+    ) {
+
+        const menit =
+            Number(item.durasi_menit);
+
+        if (
+            Number.isFinite(menit) &&
+            menit > 0
+        ) {
+
+            return menit;
+
+        }
+
+    }
+
+
+    /* ---------------------------------------------
+       3. DARI JAM MULAI & SELESAI
+    --------------------------------------------- */
+
+    const jamMulai =
+        item.jamMulai ||
+        item.jam_mulai;
+
+    const jamSelesai =
+        item.jamSelesai ||
+        item.jam_selesai;
+
+
+    if (
+        jamMulai &&
+        jamSelesai
+    ) {
+
+        const mulai =
+            parseTimeToMinutes(jamMulai);
+
+        const selesai =
+            parseTimeToMinutes(jamSelesai);
+
+
+        if (
+            mulai !== null &&
+            selesai !== null
+        ) {
+
+            let selisih =
+                selesai - mulai;
+
+
+            /*
+             * Kalau lewat tengah malam
+             */
+
+            if (selisih < 0) {
+                selisih += 24 * 60;
+            }
+
+
+            return selisih;
+
+        }
+
+    }
+
+
+    return 0;
+
+}
+
+
+/* =========================================================
+   PARSE JAM
+========================================================= */
+
+function parseTimeToMinutes(time) {
+
+    if (!time) {
+        return null;
+    }
+
+
+    const value =
+        String(time).trim();
+
+
+    const match =
+        value.match(
+            /^(\d{1,2}):(\d{2})/
+        );
+
+
+    if (!match) {
+        return null;
+    }
+
+
+    const jam =
+        Number(match[1]);
+
+    const menit =
+        Number(match[2]);
+
+
+    if (
+        jam < 0 ||
+        jam > 23 ||
+        menit < 0 ||
+        menit > 59
+    ) {
+
+        return null;
+
+    }
+
+
+    return (
+        jam * 60 +
+        menit
+    );
+
+}
+
+
+/* =========================================================
+   TOTAL JAM PER PLANNING
+========================================================= */
+
+function getTotalJamPlanning(item) {
+
+    const durasiMenit =
+        getDurasiMenitPlanning(item);
+
+    if (!durasiMenit) {
+        return 0;
+    }
+
+    return durasiMenit / 60;
+
+}
+
+
+/* =========================================================
+   TOTAL SEMUA JAM
+========================================================= */
+
+function getTotalJamLembur(planning) {
+
+    if (!Array.isArray(planning)) {
+        return 0;
+    }
+
+
+    let totalJam = 0;
+
+
+    for (
+        const item of planning
+    ) {
+
+        totalJam +=
+            getTotalJamPlanning(item);
+
+    }
+
+
+    return totalJam;
+
+}
+
+
+/* =========================================================
+   FORMAT TOTAL JAM
+========================================================= */
+
+function formatTotalJam(jam) {
+
+    const value =
+        Number(jam) || 0;
+
+
+    if (
+        Number.isInteger(value)
+    ) {
+
+        return `${value} Jam`;
+
+    }
+
+
+    return `${value.toFixed(1)} Jam`;
+
+}
+
+
+/* =========================================================
+   HTML HELPER
+========================================================= */
+
+function escapePlanningHTML(value) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+
+        return "";
+
+    }
+
+
+    return String(value)
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+
+
+/* =========================================================
+   TANGGAL
+========================================================= */
+
+function getToday() {
+
+    const now =
+        new Date();
+
+
+    return [
+
+        now.getFullYear(),
+
+        String(
+            now.getMonth() + 1
+        ).padStart(
+            2,
+            "0"
+        ),
+
+        String(
+            now.getDate()
+        ).padStart(
+            2,
+            "0"
+        )
+
+    ].join("-");
+
+}
+
+
+function formatPlanningDate(tanggal) {
+
+    if (
+        typeof formatTanggalPlanning ===
+        "function"
+    ) {
+
+        return formatTanggalPlanning(
+            tanggal
+        );
+
+    }
+
+
+    return tanggal || "-";
+
+}
+
+
+/* =========================================================
+   FORMAT DURASI
+========================================================= */
+
+function formatPlanningDuration(item) {
+
+    const menit =
+        getDurasiMenitPlanning(item);
+
+
+    if (!menit) {
+        return "-";
+    }
+
+
+    if (
+        typeof formatDurasiPlanning ===
+        "function"
+    ) {
+
+        return formatDurasiPlanning(
+            menit
+        );
+
+    }
+
+
+    const jam =
+        menit / 60;
+
+
+    if (
+        Number.isInteger(jam)
+    ) {
+
+        return `${jam} Jam`;
+
+    }
+
+
+    return `${jam.toFixed(1)} Jam`;
+
+}
+
+
+/* =========================================================
+   NAVIGASI
+========================================================= */
+
+function showPage(
+    pageId,
+    button = null
+) {
+
+    document
+        .querySelectorAll(".page")
+        .forEach(page => {
+
+            page.classList.toggle(
+                "active-page",
+                page.id === pageId
+            );
+
+        });
+
+
+    document
+        .querySelectorAll(".menu-item")
+        .forEach(item => {
+
+            item.classList.remove(
+                "active"
+            );
+
+        });
+
+
+    if (button) {
+
+        button.classList.add(
+            "active"
+        );
+
+    }
+
+
+    const info =
+        PAGE_INFO[pageId];
+
+
+    if (info) {
+
+        setText(
+            "pageTitle",
+            info[0]
+        );
+
+        setText(
+            "pageSubtitle",
+            info[1]
+        );
+
+    }
+
+
+    switch (pageId) {
+
+        case "dashboard":
+
+            updateDashboard();
+
+            break;
+
+
+        case "karyawan":
+
+            if (
+                typeof renderKaryawan ===
+                "function"
+            ) {
+
+                renderKaryawan();
+
+            }
+
+            break;
+
+
+        case "planning":
+
+            if (
+                typeof updateKaryawanDropdown ===
+                "function"
+            ) {
+
+                updateKaryawanDropdown();
+
+            }
+
+
+            if (
+                typeof renderPlanning ===
+                "function"
+            ) {
+
+                renderPlanning();
+
+            }
+
+            break;
+
+    }
+
+}
+
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
 
 function updateDashboard() {
 
     updateDashboardStats();
+
     updateDashboardCharts();
+
     renderDashboardPlanning();
+
+    AppState.dashboardInitialized =
+        true;
 
 }
 
 
-/* =====================================================
-   UPDATE STATISTIK DASHBOARD
-===================================================== */
+/* =========================================================
+   DASHBOARD STATISTICS
+========================================================= */
 
 function updateDashboardStats() {
 
-    const dataPlanning = getPlanningData();
+    const planning =
+        getPlanningData();
 
-    /* TOTAL KARYAWAN */
+
+    /* ---------------------------------------------
+       TOTAL KARYAWAN
+    --------------------------------------------- */
 
     let totalKaryawan = 0;
 
-    if (typeof getKaryawanAktif === "function") {
 
-        totalKaryawan = getKaryawanAktif().length;
+    if (
+        typeof getKaryawanAktif ===
+        "function"
+    ) {
 
-    } else if (Array.isArray(window.karyawan)) {
+        const aktif =
+            getKaryawanAktif();
 
-        totalKaryawan = window.karyawan.length;
+        totalKaryawan =
+            Array.isArray(aktif)
+                ? aktif.length
+                : 0;
+
+    } else {
+
+        totalKaryawan =
+            getKaryawanData().length;
 
     }
 
-    const elTotalKaryawan =
-        document.getElementById("totalKaryawan");
 
-    if (elTotalKaryawan) {
-        elTotalKaryawan.textContent = totalKaryawan;
-    }
-
-
-    /* TOTAL PLANNING */
-
-    const elTotalPlanning =
-        document.getElementById("totalPlanning");
-
-    if (elTotalPlanning) {
-        elTotalPlanning.textContent = dataPlanning.length;
-    }
-
-
-    /* TOTAL JAM */
+    /* ---------------------------------------------
+       TOTAL JAM
+       DURASI × JUMLAH KARYAWAN
+    --------------------------------------------- */
 
     let totalJam = 0;
 
-    dataPlanning.forEach(item => {
+    for (const item of planning) {
 
-        const durasiMenit =
-            Number(item.durasiMenit || 0);
+        const durasi =
+            getTotalJamPlanning(item);
 
-        const jumlahKaryawan =
+        const jumlah =
             getJumlahKaryawanPlanning(item);
 
         totalJam +=
-            (durasiMenit * jumlahKaryawan) / 60;
-
-    });
-
-    const elTotalJam =
-        document.getElementById("totalJam");
-
-    if (elTotalJam) {
-
-        elTotalJam.textContent =
-            Number.isInteger(totalJam)
-                ? `${totalJam} Jam`
-                : `${totalJam.toFixed(1)} Jam`;
+            durasi * jumlah;
 
     }
 
 
-    /* PLANNING HARI INI */
+    /* ---------------------------------------------
+       PLANNING HARI INI
+    --------------------------------------------- */
 
-    const now = new Date();
+    let karyawanLemburHariIni = 0;
 
-    const today =
-        new Date(
-            now.getTime() -
-            now.getTimezoneOffset() * 60000
-        )
-        .toISOString()
-        .split("T")[0];
-
-    const planningHariIni =
-        dataPlanning.filter(
-            item => String(item.tanggal || "") === today
-        ).length;
-
-    const elHariIni =
-        document.getElementById("planningHariIni");
-
-    if (elHariIni) {
-        elHariIni.textContent = planningHariIni;
-    }
+    const today = getToday();
 
 
-    /* DURASI 4 / 8 / 12 JAM */
+    /* ---------------------------------------------
+       DURASI
+    --------------------------------------------- */
 
-    let count4 = 0;
-    let count8 = 0;
-    let count12 = 0;
+    const durasi = {
 
-    dataPlanning.forEach(item => {
+        240: 0,
+
+        480: 0,
+
+        720: 0
+
+    };
+
+
+    for (
+        const item of planning
+    ) {
 
         const jumlah =
-            getJumlahKaryawanPlanning(item);
+            getJumlahKaryawanPlanning(
+                item
+            );
+
 
         const menit =
-            Number(item.durasiMenit || 0);
+            getDurasiMenitPlanning(
+                item
+            );
 
-        if (menit === 240) {
 
-            count4 += jumlah;
+        if (
+            String(
+                item.tanggal || ""
+            ) === today
+        ) {
 
-        } else if (menit === 480) {
-
-            count8 += jumlah;
-
-        } else if (menit === 720) {
-
-            count12 += jumlah;
+            karyawanLemburHariIni +=
+                jumlah;
 
         }
 
-    });
 
-    const el4 = document.getElementById("count4Jam");
-    const el8 = document.getElementById("count8Jam");
-    const el12 = document.getElementById("count12Jam");
+        if (
+            durasi[menit] !==
+            undefined
+        ) {
 
-    if (el4) {
-        el4.textContent = count4;
+            durasi[menit] +=
+                jumlah;
+
+        }
+
     }
 
-    if (el8) {
-        el8.textContent = count8;
-    }
 
-    if (el12) {
-        el12.textContent = count12;
-    }
+    /* ---------------------------------------------
+       TAMPILKAN
+    --------------------------------------------- */
+
+    setText(
+        "totalKaryawan",
+        totalKaryawan
+    );
+
+
+    setText(
+        "totalPlanning",
+        planning.length
+    );
+
+
+    setText(
+        "totalJam",
+        formatTotalJam(
+            totalJam
+        )
+    );
+
+
+    setText(
+        "planningHariIni",
+        karyawanLemburHariIni
+    );
+
+
+    setText(
+        "count4Jam",
+        durasi[240]
+    );
+
+
+    setText(
+        "count8Jam",
+        durasi[480]
+    );
+
+
+    setText(
+        "count12Jam",
+        durasi[720]
+    );
 
 }
 
 
-/* =====================================================
-   UPDATE SEMUA CHART
-===================================================== */
+/* =========================================================
+   CHART UPDATE
+========================================================= */
 
 function updateDashboardCharts() {
 
-    if (typeof Chart === "undefined") {
+    if (
+        typeof Chart ===
+        "undefined"
+    ) {
 
-        console.warn("Chart.js belum termuat.");
+        console.warn(
+            "[APP] Chart.js belum tersedia."
+        );
 
         return;
+
     }
 
-    if (!Array.isArray(window.planning)) {
-        return;
-    }
 
-    renderPlanningChart();
-    renderDurasiChart();
-    renderKaryawanChart();
+    const planning =
+        getPlanningData();
+
+
+    renderPlanningChart(
+        planning
+    );
+
+
+    renderDurasiChart(
+        planning
+    );
+
+
+    renderKaryawanChart(
+        planning
+    );
 
 }
 
 
-/* =====================================================
-   GRAFIK TREND MAND POWER
-===================================================== */
+/* =========================================================
+   GRAFIK PLANNING
+========================================================= */
 
-function renderPlanningChart() {
+function renderPlanningChart(
+    planning = getPlanningData()
+) {
 
     const canvas =
-        document.getElementById("planningChart");
+        appEl(
+            "planningChart"
+        );
 
-    if (!canvas || typeof Chart === "undefined") {
+
+    if (
+        !canvas ||
+        typeof Chart ===
+        "undefined"
+    ) {
+
         return;
+
     }
 
-    const dataTanggal = {};
 
-    window.planning.forEach(item => {
+    const tanggalMap =
+        Object.create(null);
+
+
+    for (
+        const item of planning
+    ) {
 
         const tanggal =
-            String(item.tanggal || "");
+            String(
+                item.tanggal || ""
+            );
+
 
         if (!tanggal) {
-            return;
+            continue;
         }
 
-        const jumlah =
-            getJumlahKaryawanPlanning(item);
 
-        dataTanggal[tanggal] =
-            (dataTanggal[tanggal] || 0) + jumlah;
-
-    });
-
-    const tanggalList =
-        Object.keys(dataTanggal).sort();
-
-    const labelTanggal =
-        tanggalList.map(tanggal => {
-
-            return typeof formatTanggalPlanning === "function"
-                ? formatTanggalPlanning(tanggal)
-                : tanggal;
-
-        });
-
-    const dataJumlah =
-        tanggalList.map(tanggal => dataTanggal[tanggal]);
-
-    if (planningChartInstance) {
-
-        planningChartInstance.destroy();
-        planningChartInstance = null;
+        tanggalMap[tanggal] =
+            (
+                tanggalMap[tanggal] ||
+                0
+            ) +
+            getJumlahKaryawanPlanning(
+                item
+            );
 
     }
+
+
+    const tanggal =
+        Object.keys(
+            tanggalMap
+        ).sort();
+
+
+    const labels =
+        tanggal.map(
+            formatPlanningDate
+        );
+
+
+    const values =
+        tanggal.map(
+            key =>
+                tanggalMap[key]
+        );
+
+
+    const data = {
+
+        labels,
+
+        datasets: [{
+
+            label:
+                "Mand Power",
+
+            data:
+                values,
+
+            borderColor:
+                APP_COLORS.primary,
+
+            backgroundColor:
+                "rgba(215, 25, 32, 0.10)",
+
+            borderWidth:
+                2.5,
+
+            tension:
+                0.35,
+
+            fill:
+                true,
+
+            pointRadius:
+                4,
+
+            pointHoverRadius:
+                6,
+
+            pointBackgroundColor:
+                APP_COLORS.surface,
+
+            pointBorderColor:
+                APP_COLORS.primary,
+
+            pointBorderWidth:
+                2
+
+        }]
+
+    };
+
+
+    if (
+        planningChartInstance
+    ) {
+
+        planningChartInstance.data =
+            data;
+
+
+        planningChartInstance.update(
+            "none"
+        );
+
+
+        return;
+
+    }
+
 
     planningChartInstance =
-        new Chart(canvas, {
+        new Chart(
+            canvas,
+            {
 
-            type: "line",
+                type:
+                    "line",
 
-            data: {
+                data,
 
-                labels: labelTanggal,
+                options: {
 
-                datasets: [{
+                    responsive:
+                        true,
 
-                    label: "Mand Power",
-                    data: dataJumlah,
-                    borderColor: "#d71920",
-                    backgroundColor: "rgba(215,25,32,0.10)",
-                    borderWidth: 2.5,
-                    tension: 0.35,
-                    fill: true,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
+                    maintainAspectRatio:
+                        false,
 
-                }]
+                    interaction: {
 
-            },
+                        intersect:
+                            false,
 
-            options: {
+                        mode:
+                            "index"
 
-                responsive: true,
-                maintainAspectRatio: false,
-
-                interaction: {
-                    intersect: false,
-                    mode: "index"
-                },
-
-                plugins: {
-
-                    legend: {
-                        display: true
                     },
 
-                    tooltip: {
+                    plugins: {
 
-                        callbacks: {
+                        legend: {
 
-                            label: function(context) {
+                            labels: {
 
-                                return ` ${context.parsed.y} Mand Power`;
+                                color:
+                                    APP_COLORS.text,
+
+                                font: {
+
+                                    weight:
+                                        "600"
+
+                                }
 
                             }
 
                         }
 
-                    }
-
-                },
-
-                scales: {
-
-                    y: {
-
-                        beginAtZero: true,
-
-                        ticks: {
-                            precision: 0
-                        },
-
-                        title: {
-
-                            display: true,
-                            text: "Jumlah Karyawan"
-
-                        }
-
                     },
 
-                    x: {
+                    scales: {
 
-                        grid: {
-                            display: false
+                        x: {
+
+                            grid: {
+
+                                color:
+                                    "rgba(148,163,184,0.12)"
+
+                            },
+
+                            ticks: {
+
+                                color:
+                                    APP_COLORS.textSoft
+
+                            }
+
                         },
 
-                        title: {
+                        y: {
 
-                            display: true,
-                            text: "Tanggal"
+                            beginAtZero:
+                                true,
+
+                            grid: {
+
+                                color:
+                                    "rgba(148,163,184,0.12)"
+
+                            },
+
+                            ticks: {
+
+                                color:
+                                    APP_COLORS.textSoft,
+
+                                precision:
+                                    0
+
+                            }
 
                         }
 
@@ -477,133 +1193,176 @@ function renderPlanningChart() {
                 }
 
             }
-
-        });
+        );
 
 }
 
 
-/* =====================================================
-   GRAFIK DISTRIBUSI DURASI
-===================================================== */
+/* =========================================================
+   GRAFIK DURASI
+========================================================= */
 
-function renderDurasiChart() {
+function renderDurasiChart(
+    planning = getPlanningData()
+) {
 
     const canvas =
-        document.getElementById("durasiChart");
+        appEl(
+            "durasiChart"
+        );
 
-    if (!canvas || typeof Chart === "undefined") {
+
+    if (
+        !canvas ||
+        typeof Chart ===
+        "undefined"
+    ) {
+
         return;
+
     }
 
-    let count4 = 0;
-    let count8 = 0;
-    let count12 = 0;
 
-    window.planning.forEach(item => {
+    const count = {
 
-        const durasi =
-            Number(item.durasiMenit || 0);
+        240: 0,
 
-        const jumlah =
-            getJumlahKaryawanPlanning(item);
+        480: 0,
 
-        if (durasi === 240) {
+        720: 0
 
-            count4 += jumlah;
+    };
 
-        } else if (durasi === 480) {
 
-            count8 += jumlah;
+    for (
+        const item of planning
+    ) {
 
-        } else if (durasi === 720) {
+        const menit =
+            getDurasiMenitPlanning(
+                item
+            );
 
-            count12 += jumlah;
+
+        if (
+            count[menit] !==
+            undefined
+        ) {
+
+            count[menit] +=
+                getJumlahKaryawanPlanning(
+                    item
+                );
 
         }
 
-    });
+    }
 
-    if (durasiChartInstance) {
 
-        durasiChartInstance.destroy();
-        durasiChartInstance = null;
+    const data = {
+
+        labels: [
+
+            "4 Jam",
+
+            "8 Jam",
+
+            "12 Jam"
+
+        ],
+
+        datasets: [{
+
+            data: [
+
+                count[240],
+
+                count[480],
+
+                count[720]
+
+            ],
+
+            backgroundColor: [
+
+                APP_COLORS.primary,
+
+                APP_COLORS.amber,
+
+                APP_COLORS.navyLight
+
+            ],
+
+            borderWidth:
+                0,
+
+            hoverOffset:
+                6
+
+        }]
+
+    };
+
+
+    if (
+        durasiChartInstance
+    ) {
+
+        durasiChartInstance.data =
+            data;
+
+
+        durasiChartInstance.update(
+            "none"
+        );
+
+
+        return;
 
     }
+
 
     durasiChartInstance =
-        new Chart(canvas, {
+        new Chart(
+            canvas,
+            {
 
-            type: "doughnut",
+                type:
+                    "doughnut",
 
-            data: {
+                data,
 
-                labels: [
-                    "4 Jam",
-                    "8 Jam",
-                    "12 Jam"
-                ],
+                options: {
 
-                datasets: [{
+                    responsive:
+                        true,
 
-                    data: [
-                        count4,
-                        count8,
-                        count12
-                    ],
+                    maintainAspectRatio:
+                        false,
 
-                    backgroundColor: [
-                        "#d71920",
-                        "#f59e0b",
-                        "#374151"
-                    ],
+                    cutout:
+                        "68%",
 
-                    borderWidth: 0
+                    plugins: {
 
-                }]
+                        legend: {
 
-            },
+                            position:
+                                "bottom",
 
-            options: {
+                            labels: {
 
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: "68%",
+                                color:
+                                    APP_COLORS.text,
 
-                plugins: {
+                                padding:
+                                    18,
 
-                    legend: {
-                        position: "bottom"
-                    },
+                                usePointStyle:
+                                    true,
 
-                    tooltip: {
-
-                        callbacks: {
-
-                            label: function(context) {
-
-                                const total =
-                                    context.dataset.data.reduce(
-                                        (a, b) => a + b,
-                                        0
-                                    );
-
-                                const value =
-                                    context.parsed;
-
-                                const percentage =
-                                    total > 0
-                                        ? (
-                                            value /
-                                            total *
-                                            100
-                                        ).toFixed(1)
-                                        : 0;
-
-                                return (
-                                    ` ${context.label}: ` +
-                                    `${value} (${percentage}%)`
-                                );
+                                pointStyle:
+                                    "circle"
 
                             }
 
@@ -614,130 +1373,271 @@ function renderDurasiChart() {
                 }
 
             }
-
-        });
+        );
 
 }
 
 
-/* =====================================================
-   TOP KARYAWAN LEMBUR
-===================================================== */
+/* =========================================================
+   TOP KARYAWAN
+========================================================= */
 
-function renderKaryawanChart() {
+function renderKaryawanChart(
+    planning = getPlanningData()
+) {
 
     const canvas =
-        document.getElementById("karyawanChart");
+        appEl(
+            "karyawanChart"
+        );
 
-    if (!canvas || typeof Chart === "undefined") {
+
+    if (
+        !canvas ||
+        typeof Chart ===
+        "undefined"
+    ) {
+
         return;
+
     }
 
-    const jumlahKaryawan = {};
 
-    window.planning.forEach(item => {
+    const rankingMap =
+        Object.create(null);
 
-        if (!Array.isArray(item.karyawan)) {
-            return;
+
+    for (
+        const item of planning
+    ) {
+
+        if (
+            !Array.isArray(
+                item.karyawan
+            )
+        ) {
+
+            continue;
+
         }
 
-        item.karyawan.forEach(dataKaryawan => {
+
+        for (
+            const karyawan
+            of item.karyawan
+        ) {
 
             const id =
                 String(
-                    dataKaryawan.id ||
-                    dataKaryawan.idKaryawan ||
-                    dataKaryawan.nik ||
-                    dataKaryawan.NIK ||
-                    dataKaryawan.NIB ||
+
+                    karyawan.id ||
+
+                    karyawan.idKaryawan ||
+
+                    karyawan.nik ||
+
+                    karyawan.NIK ||
+
+                    karyawan.kode_karyawan ||
+
+                    karyawan.kodeKaryawan ||
+
                     ""
+
                 ).trim();
+
+
+            if (!id) {
+                continue;
+            }
+
 
             const nama =
                 String(
-                    dataKaryawan.nama ||
-                    dataKaryawan.namaKaryawan ||
-                    dataKaryawan.Nama ||
+
+                    karyawan.nama ||
+
+                    karyawan.namaKaryawan ||
+
+                    karyawan.Nama ||
+
+                    karyawan.nama_karyawan ||
+
                     id
+
                 ).trim();
 
-            if (!id) {
-                return;
-            }
 
-            if (!jumlahKaryawan[id]) {
+            if (
+                !rankingMap[id]
+            ) {
 
-                jumlahKaryawan[id] = {
-                    nama: nama,
-                    jumlah: 0
+                rankingMap[id] = {
+
+                    nama,
+
+                    jumlah:
+                        0
+
                 };
 
             }
 
-            jumlahKaryawan[id].jumlah++;
 
-        });
+            rankingMap[id].jumlah++;
 
-    });
-
-    const ranking =
-        Object.values(jumlahKaryawan)
-            .sort((a, b) => b.jumlah - a.jumlah)
-            .slice(0, 10);
-
-    const labels =
-        ranking.map(item => item.nama);
-
-    const values =
-        ranking.map(item => item.jumlah);
-
-    if (karyawanChartInstance) {
-
-        karyawanChartInstance.destroy();
-        karyawanChartInstance = null;
+        }
 
     }
 
+
+    const ranking =
+        Object.values(
+            rankingMap
+        )
+            .sort(
+                (a, b) =>
+                    b.jumlah -
+                    a.jumlah
+            )
+            .slice(
+                0,
+                10
+            );
+
+
+    const data = {
+
+        labels:
+            ranking.map(
+                item =>
+                    item.nama
+            ),
+
+        datasets: [{
+
+            label:
+                "Jumlah Planning",
+
+            data:
+                ranking.map(
+                    item =>
+                        item.jumlah
+                ),
+
+            backgroundColor:
+                APP_COLORS.primary,
+
+            borderRadius:
+                7,
+
+            borderSkipped:
+                false,
+
+            hoverBackgroundColor:
+                APP_COLORS.primaryDark
+
+        }]
+
+    };
+
+
+    if (
+        karyawanChartInstance
+    ) {
+
+        karyawanChartInstance.data =
+            data;
+
+
+        karyawanChartInstance.update(
+            "none"
+        );
+
+
+        return;
+
+    }
+
+
     karyawanChartInstance =
-        new Chart(canvas, {
+        new Chart(
+            canvas,
+            {
 
-            type: "bar",
+                type:
+                    "bar",
 
-            data: {
+                data,
 
-                labels: labels,
+                options: {
 
-                datasets: [{
+                    indexAxis:
+                        "y",
 
-                    label: "Jumlah Planning",
-                    data: values,
-                    backgroundColor: "#d71920",
-                    borderRadius: 6,
-                    borderSkipped: false
+                    responsive:
+                        true,
 
-                }]
+                    maintainAspectRatio:
+                        false,
 
-            },
+                    plugins: {
 
-            options: {
+                        legend: {
 
-                indexAxis: "y",
-                responsive: true,
-                maintainAspectRatio: false,
+                            display:
+                                false
 
-                plugins: {
+                        }
 
-                    legend: {
-                        display: false
                     },
 
-                    tooltip: {
+                    scales: {
 
-                        callbacks: {
+                        x: {
 
-                            label: function(context) {
+                            beginAtZero:
+                                true,
 
-                                return ` ${context.parsed.x} planning`;
+                            grid: {
+
+                                color:
+                                    "rgba(148,163,184,0.12)"
+
+                            },
+
+                            ticks: {
+
+                                color:
+                                    APP_COLORS.textSoft,
+
+                                precision:
+                                    0
+
+                            }
+
+                        },
+
+                        y: {
+
+                            grid: {
+
+                                display:
+                                    false
+
+                            },
+
+                            ticks: {
+
+                                color:
+                                    APP_COLORS.text,
+
+                                font: {
+
+                                    weight:
+                                        "600"
+
+                                }
 
                             }
 
@@ -745,315 +1645,472 @@ function renderKaryawanChart() {
 
                     }
 
-                },
-
-                scales: {
-
-                    x: {
-
-                        beginAtZero: true,
-
-                        ticks: {
-                            precision: 0
-                        },
-
-                        title: {
-
-                            display: true,
-                            text: "Jumlah Planning"
-
-                        }
-
-                    },
-
-                    y: {
-
-                        grid: {
-                            display: false
-                        }
-
-                    }
-
                 }
 
             }
-
-        });
+        );
 
 }
 
 
-/* =====================================================
+/* =========================================================
    TANGGAL SEKARANG
-===================================================== */
+========================================================= */
 
 function tampilkanTanggal() {
 
     const element =
-        document.getElementById("tanggalSekarang");
+        appEl(
+            "tanggalSekarang"
+        );
+
 
     if (!element) {
         return;
     }
 
+
     element.textContent =
-        new Date().toLocaleDateString(
-            "id-ID",
-            {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric"
-            }
-        );
+        new Date()
+            .toLocaleDateString(
+                "id-ID",
+                {
+
+                    weekday:
+                        "long",
+
+                    day:
+                        "numeric",
+
+                    month:
+                        "long",
+
+                    year:
+                        "numeric"
+
+                }
+            );
 
 }
 
 
-/* =====================================================
-   CLOSE SEMUA MODAL
-===================================================== */
+/* =========================================================
+   CLOSE MODAL
+========================================================= */
 
 function closeAllModals() {
 
-    if (typeof closePenaltyModal === "function") {
+    if (
+        typeof closePenaltyModal ===
+        "function"
+    ) {
+
         closePenaltyModal();
+
     }
 
-    if (typeof closePlanningModal === "function") {
+
+    if (
+        typeof closePlanningModal ===
+        "function"
+    ) {
+
         closePlanningModal();
+
+    }
+
+
+    if (
+        typeof tutupRiwayatLembur ===
+        "function"
+    ) {
+
+        tutupRiwayatLembur();
+
     }
 
 }
 
 
-/* =====================================================
-   PLANNING TERBARU DI DASHBOARD
-===================================================== */
+/* =========================================================
+   PLANNING TERBARU
+========================================================= */
 
 function renderDashboardPlanning() {
 
     const tbody =
-        document.getElementById("dashboardPlanning");
+        appEl(
+            "dashboardPlanning"
+        );
+
 
     if (!tbody) {
         return;
     }
 
-    tbody.innerHTML = "";
 
-    const dataPlanning = getPlanningData();
+    const planning =
+        getPlanningData();
 
-    if (dataPlanning.length === 0) {
+
+    if (!planning.length) {
 
         tbody.innerHTML = `
+
             <tr>
-                <td colspan="5" style="text-align:center;">
+
+                <td
+                    colspan="5"
+                    style="
+                        text-align:center;
+                        color:${APP_COLORS.textSoft};
+                        padding:28px;
+                    "
+                >
+
                     Belum ada planning
+
                 </td>
+
             </tr>
+
         `;
 
         return;
+
     }
 
+
     const data =
-        [...dataPlanning]
-            .sort((a, b) => {
+        planning
+            .slice()
+            .sort(
+                (a, b) => {
 
-                const dateA =
-                    new Date(
-                        a.createdAt ||
-                        a.tanggal ||
-                        0
-                    );
+                    const dateA =
+                        new Date(
+                            a.createdAt ||
+                            a.created_at ||
+                            a.tanggal ||
+                            0
+                        ).getTime();
 
-                const dateB =
-                    new Date(
-                        b.createdAt ||
-                        b.tanggal ||
-                        0
-                    );
 
-                return dateB - dateA;
+                    const dateB =
+                        new Date(
+                            b.createdAt ||
+                            b.created_at ||
+                            b.tanggal ||
+                            0
+                        ).getTime();
 
-            })
-            .slice(0, 5);
 
-    data.forEach(item => {
+                    return dateB - dateA;
 
-        const jumlah =
-            getJumlahKaryawanPlanning(item);
-
-        const tanggal =
-            typeof formatTanggalPlanning === "function"
-                ? formatTanggalPlanning(item.tanggal)
-                : item.tanggal || "-";
-
-        const durasi =
-            item.durasi ||
-            (
-                typeof formatDurasiPlanning === "function"
-                    ? formatDurasiPlanning(item.durasiMenit)
-                    : "-"
+                }
+            )
+            .slice(
+                0,
+                5
             );
 
-        const idPlanning =
-            item.idPlanning ||
-            item.id ||
-            "-";
+
+    const fragment =
+        document.createDocumentFragment();
+
+
+    for (
+        const item of data
+    ) {
 
         const tr =
-            document.createElement("tr");
+            document.createElement(
+                "tr"
+            );
+
 
         tr.innerHTML = `
-            <td>${escapePlanningHTML(tanggal)}</td>
-
-            <td>${escapePlanningHTML(idPlanning)}</td>
-
-            <td>${jumlah}</td>
 
             <td>
                 ${escapePlanningHTML(
-                    `${item.jamMulai || "-"} - ${item.jamSelesai || "-"}`
+                    formatPlanningDate(
+                        item.tanggal
+                    )
                 )}
             </td>
 
-            <td>${escapePlanningHTML(durasi)}</td>
+            <td>
+                ${escapePlanningHTML(
+                    item.idPlanning ||
+                    item.id ||
+                    "-"
+                )}
+            </td>
+
+            <td>
+                ${getJumlahKaryawanPlanning(
+                    item
+                )}
+            </td>
+
+            <td>
+                ${escapePlanningHTML(
+                    `${
+                        item.jamMulai ||
+                        item.jam_mulai ||
+                        "-"
+                    } - ${
+                        item.jamSelesai ||
+                        item.jam_selesai ||
+                        "-"
+                    }`
+                )}
+            </td>
+
+            <td>
+                ${escapePlanningHTML(
+                    formatPlanningDuration(
+                        item
+                    )
+                )}
+            </td>
+
         `;
 
-        tbody.appendChild(tr);
 
-    });
+        fragment.appendChild(
+            tr
+        );
 
-}
-
-
-/* =====================================================
-   SETUP FORM KARYAWAN
-===================================================== */
-
-function setupFormKaryawan() {
-
-    const form =
-        document.getElementById("formKaryawan");
-
-    if (!form || form.dataset.appListener) {
-        return;
     }
 
-    form.addEventListener("submit", function(event) {
 
-        event.preventDefault();
-
-        if (typeof tambahKaryawan === "function") {
-            tambahKaryawan();
-        }
-
-    });
-
-    form.dataset.appListener = "true";
+    tbody.replaceChildren(
+        fragment
+    );
 
 }
 
 
-/* =====================================================
-   SETUP BACKDROP MODAL
-===================================================== */
+/* =========================================================
+   MODAL BACKDROP
+========================================================= */
 
-function setupModalBackdrop(modalId, closeFunction) {
+function setupModalBackdrop(
+    modalId,
+    closeFunction
+) {
 
     const modal =
-        document.getElementById(modalId);
+        appEl(
+            modalId
+        );
 
-    if (!modal || modal.dataset.backdropListener) {
+
+    if (
+        !modal ||
+        modal.dataset.backdropListener
+    ) {
+
         return;
+
     }
 
-    modal.addEventListener("click", function(event) {
 
-        if (event.target !== modal) {
-            return;
+    modal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target !==
+                modal
+            ) {
+
+                return;
+
+            }
+
+
+            if (
+                typeof closeFunction ===
+                "function"
+            ) {
+
+                closeFunction();
+
+            }
+
         }
+    );
 
-        if (typeof closeFunction === "function") {
-            closeFunction();
-        }
 
-    });
-
-    modal.dataset.backdropListener = "true";
+    modal.dataset.backdropListener =
+        "true";
 
 }
 
 
-/* =====================================================
+/* =========================================================
+   REFRESH APP
+========================================================= */
+
+function refreshApp() {
+
+    console.log(
+        "[APP] Refresh dashboard"
+    );
+
+
+    debugAppData();
+
+
+    if (
+        typeof updateKaryawanDropdown ===
+        "function"
+    ) {
+
+        updateKaryawanDropdown();
+
+    }
+
+
+    if (
+        typeof renderKaryawan ===
+        "function"
+    ) {
+
+        renderKaryawan();
+
+    }
+
+
+    if (
+        typeof renderPlanning ===
+        "function"
+    ) {
+
+        renderPlanning();
+
+    }
+
+
+    updateDashboard();
+
+}
+
+
+/* =========================================================
    INITIAL DATA
-===================================================== */
+========================================================= */
 
 function loadInitialData() {
 
-    if (typeof updateKaryawanDropdown === "function") {
-        updateKaryawanDropdown();
-    }
+    console.log(
+        "[APP] DOM loaded"
+    );
 
-    if (typeof renderKaryawan === "function") {
-        renderKaryawan();
-    }
 
-    if (typeof renderPlanning === "function") {
-        renderPlanning();
-    }
+    refreshApp();
 
-    updateDashboard();
+
     tampilkanTanggal();
+
+
+    AppState.initialized =
+        true;
 
 }
 
 
-/* =====================================================
+/* =========================================================
+   DATABASE READY
+========================================================= */
+
+function handleDatabaseReady() {
+
+    console.log(
+        "[APP] databaseReady diterima"
+    );
+
+
+    AppState.databaseReady =
+        true;
+
+
+    requestAnimationFrame(
+        () => {
+
+            refreshApp();
+
+        }
+    );
+
+}
+
+
+/* =========================================================
    DOM READY
-===================================================== */
+========================================================= */
 
 document.addEventListener(
     "DOMContentLoaded",
-    function() {
-
-        setupFormKaryawan();
+    () => {
 
         loadInitialData();
 
+
         setupModalBackdrop(
             "planningModal",
-            typeof closePlanningModal === "function"
+            typeof closePlanningModal ===
+                "function"
                 ? closePlanningModal
                 : null
         );
 
+
         setupModalBackdrop(
             "penaltyModal",
-            typeof closePenaltyModal === "function"
+            typeof closePenaltyModal ===
+                "function"
                 ? closePenaltyModal
                 : null
         );
 
 
-        /* ESC = CLOSE MODAL */
+        setupModalBackdrop(
+            "historyKaryawanModal",
+            typeof tutupRiwayatLembur ===
+                "function"
+                ? tutupRiwayatLembur
+                : null
+        );
 
-        if (!document.body.dataset.escapeListener) {
+
+        if (
+            !document.body.dataset
+                .escapeListener
+        ) {
 
             document.addEventListener(
                 "keydown",
-                function(event) {
+                event => {
 
-                    if (event.key === "Escape") {
+                    if (
+                        event.key ===
+                        "Escape"
+                    ) {
+
                         closeAllModals();
+
                     }
 
                 }
             );
 
-            document.body.dataset.escapeListener = "true";
+
+            document.body.dataset
+                .escapeListener =
+                "true";
 
         }
 
@@ -1061,27 +2118,87 @@ document.addEventListener(
 );
 
 
-/* =====================================================
-   DATABASE READY
-===================================================== */
+/* =========================================================
+   DATABASE READY EVENT
+========================================================= */
 
 document.addEventListener(
     "databaseReady",
-    function() {
+    handleDatabaseReady
+);
 
-        if (typeof updateKaryawanDropdown === "function") {
-            updateKaryawanDropdown();
-        }
 
-        if (typeof renderKaryawan === "function") {
-            renderKaryawan();
-        }
+/* =========================================================
+   GLOBAL EXPORT
+========================================================= */
 
-        if (typeof renderPlanning === "function") {
-            renderPlanning();
-        }
+window.getPlanningData =
+    getPlanningData;
 
-        updateDashboard();
+window.getKaryawanData =
+    getKaryawanData;
 
-    }
+window.getJumlahKaryawanPlanning =
+    getJumlahKaryawanPlanning;
+
+window.getDurasiMenitPlanning =
+    getDurasiMenitPlanning;
+
+window.getTotalJamPlanning =
+    getTotalJamPlanning;
+
+window.getTotalJamLembur =
+    getTotalJamLembur;
+
+window.showPage =
+    showPage;
+
+window.updateDashboard =
+    updateDashboard;
+
+window.updateDashboardStats =
+    updateDashboardStats;
+
+window.updateDashboardCharts =
+    updateDashboardCharts;
+
+window.renderPlanningChart =
+    renderPlanningChart;
+
+window.renderDurasiChart =
+    renderDurasiChart;
+
+window.renderKaryawanChart =
+    renderKaryawanChart;
+
+window.renderDashboardPlanning =
+    renderDashboardPlanning;
+
+window.tampilkanTanggal =
+    tampilkanTanggal;
+
+window.closeAllModals =
+    closeAllModals;
+
+window.escapePlanningHTML =
+    escapePlanningHTML;
+
+window.refreshApp =
+    refreshApp;
+
+
+/* =========================================================
+   GLOBAL COLOR SYSTEM
+========================================================= */
+
+window.APP_COLORS =
+    APP_COLORS;
+
+
+/* =========================================================
+   LOAD MESSAGE
+========================================================= */
+
+console.log(
+    "app.js optimized + modern color system loaded"
 );
