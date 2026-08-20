@@ -1,7 +1,8 @@
 /* =====================================================
    DATABASE SUPABASE
    LINFOX - DATABASE.JS
-   VERSI OPTIMASI - LOGIKA TETAP SAMA
+   VERSI OPTIMASI
+   LOGIKA TETAP SAMA
 ===================================================== */
 
 
@@ -65,7 +66,6 @@ catch (error) {
 let karyawan = [];
 let planning = [];
 
-
 window.karyawan = karyawan;
 window.planning = planning;
 
@@ -87,12 +87,29 @@ let databaseReadyPromise = null;
 
 
 /* =====================================================
-   HELPER
+   HELPER DASAR
 ===================================================== */
 
 function normalizeId(value) {
 
     return String(value ?? "")
+        .trim()
+        .toUpperCase();
+
+}
+
+
+function normalizeText(value) {
+
+    return String(value ?? "")
+        .trim();
+
+}
+
+
+function normalizeStatus(value) {
+
+    return String(value ?? "AKTIF")
         .trim()
         .toUpperCase();
 
@@ -118,6 +135,13 @@ function cloneData(data) {
         return [];
 
     }
+
+}
+
+
+function isArray(value) {
+
+    return Array.isArray(value);
 
 }
 
@@ -155,7 +179,7 @@ function formatDurasiDatabase(menit) {
 
 function normalisasiKaryawanData(data) {
 
-    if (!Array.isArray(data)) {
+    if (!isArray(data)) {
 
         return [];
 
@@ -177,47 +201,77 @@ function normalisasiKaryawanData(data) {
                 );
 
             const nama =
-                String(
-                    item.nama ?? ""
-                ).trim();
+                normalizeText(
+                    item.nama
+                );
 
             const status =
-                String(
-                    item.status ?? "AKTIF"
-                )
-                .trim()
-                .toUpperCase();
+                normalizeStatus(
+                    item.status
+                );
 
             const alasanPenalti =
-                String(
+                normalizeText(
                     item.alasan_penalti ??
-                    item.alasanPenalti ??
-                    ""
-                ).trim();
+                    item.alasanPenalti
+                );
 
             return {
 
-                id: id,
+                id,
 
-                nama: nama,
+                nama,
 
-                status: status,
+                status,
 
-                alasanPenalti:
-                    alasanPenalti
+                alasanPenalti
 
             };
 
         })
-        .filter(item => {
+        .filter(item =>
+            item &&
+            item.id &&
+            item.nama
+        );
 
-            return (
-                item &&
-                item.id &&
-                item.nama
-            );
+}
 
-        });
+
+/* =====================================================
+   BENTUK OBJECT KARYAWAN DATABASE
+===================================================== */
+
+function normalisasiKaryawanDatabase(data) {
+
+    if (!isArray(data)) {
+
+        return [];
+
+    }
+
+    return data
+        .map(item => {
+
+            const normalized =
+                normalisasiKaryawanData([item])[0];
+
+            if (!normalized) {
+
+                return null;
+
+            }
+
+            normalized.databaseId =
+                item.id;
+
+            normalized.idDatabase =
+                item.id;
+
+            return normalized;
+
+        })
+        .filter(Boolean);
 
 }
 
@@ -249,6 +303,12 @@ function cekSupabase() {
 
 async function loadKaryawanSupabase() {
 
+    if (!cekSupabase()) {
+
+        return [];
+
+    }
+
     const {
         data,
         error
@@ -263,7 +323,6 @@ async function loadKaryawanSupabase() {
                 }
             );
 
-
     if (error) {
 
         console.error(
@@ -274,7 +333,6 @@ async function loadKaryawanSupabase() {
         throw error;
 
     }
-
 
     return normalisasiKaryawanData(data);
 
@@ -301,7 +359,6 @@ async function loadPlanningSupabase() {
                 }
             );
 
-
     if (error) {
 
         console.error(
@@ -313,8 +370,7 @@ async function loadPlanningSupabase() {
 
     }
 
-
-    return Array.isArray(data)
+    return isArray(data)
         ? data
         : [];
 
@@ -337,7 +393,6 @@ async function loadRelasiPlanningSupabase() {
                 "planning_id, karyawan_id"
             );
 
-
     if (error) {
 
         console.error(
@@ -349,8 +404,7 @@ async function loadRelasiPlanningSupabase() {
 
     }
 
-
-    return Array.isArray(data)
+    return isArray(data)
         ? data
         : [];
 
@@ -367,99 +421,95 @@ function bentukDataPlanning(
     dataKaryawan
 ) {
 
-    if (!Array.isArray(dataPlanning)) {
+    if (!isArray(dataPlanning)) {
 
         return [];
 
     }
 
-
     const daftarKaryawanDB =
-        Array.isArray(dataKaryawan)
+        isArray(dataKaryawan)
             ? dataKaryawan
             : [];
 
 
-    /*
-       Buat map supaya pencarian karyawan
-       tidak menggunakan .find() berkali-kali.
-    */
+    /* =================================================
+       MAP KARYAWAN
+    ================================================= */
 
     const karyawanMap =
         new Map();
 
+    for (
+        const k of daftarKaryawanDB
+    ) {
 
-    daftarKaryawanDB.forEach(
-        k => {
+        const databaseId =
+            String(
+                k.databaseId ??
+                k.idDatabase ??
+                k._databaseId ??
+                ""
+            );
 
-            const databaseId =
-                String(
-                    k.databaseId ??
-                    k.idDatabase ??
-                    k._databaseId ??
-                    ""
-                );
+        if (databaseId) {
 
-
-            if (databaseId) {
-
-                karyawanMap.set(
-                    databaseId,
-                    k
-                );
-
-            }
+            karyawanMap.set(
+                databaseId,
+                k
+            );
 
         }
-    );
+
+    }
 
 
-    /*
-       Buat map relasi berdasarkan planning_id.
-       Ini jauh lebih cepat daripada filter()
-       untuk setiap planning.
-    */
+    /* =================================================
+       MAP RELASI
+    ================================================= */
 
     const relasiMap =
         new Map();
 
+    if (isArray(dataRelasi)) {
 
-    if (Array.isArray(dataRelasi)) {
+        for (
+            const relation of dataRelasi
+        ) {
 
-        dataRelasi.forEach(
-            relation => {
+            const planningId =
+                String(
+                    relation.planning_id
+                );
 
-                const planningId =
-                    String(
-                        relation.planning_id
-                    );
+            let list =
+                relasiMap.get(
+                    planningId
+                );
 
+            if (!list) {
 
-                if (
-                    !relasiMap.has(
-                        planningId
-                    )
-                ) {
+                list = [];
 
-                    relasiMap.set(
-                        planningId,
-                        []
-                    );
-
-                }
-
-
-                relasiMap
-                    .get(planningId)
-                    .push(
-                        relation
-                    );
+                relasiMap.set(
+                    planningId,
+                    list
+                );
 
             }
-        );
+
+            list.push(
+                relation
+            );
+
+        }
 
     }
 
+
+    /* =================================================
+       BENTUK PLANNING
+    ================================================= */
 
     return dataPlanning
         .map(item => {
@@ -470,7 +520,6 @@ function bentukDataPlanning(
 
             }
 
-
             const relasi =
                 relasiMap.get(
                     String(item.id)
@@ -479,46 +528,45 @@ function bentukDataPlanning(
 
             const daftarKaryawan =
                 relasi
-                    .map(
-                        relation => {
+                    .map(relation => {
 
-                            const karyawanId =
-                                String(
-                                    relation.karyawan_id
-                                );
+                        const karyawanId =
+                            String(
+                                relation.karyawan_id
+                            );
 
+                        const data =
+                            karyawanMap.get(
+                                karyawanId
+                            );
 
-                            const data =
-                                karyawanMap.get(
-                                    karyawanId
-                                );
+                        if (!data) {
 
-
-                            if (!data) {
-
-                                return null;
-
-                            }
-
-
-                            return {
-
-                                id:
-                                    normalizeId(
-                                        data.id
-                                    ),
-
-                                nama:
-                                    String(
-                                        data.nama || ""
-                                    ).trim()
-
-                            };
+                            return null;
 
                         }
-                    )
+
+                        return {
+
+                            id:
+                                normalizeId(
+                                    data.id
+                                ),
+
+                            nama:
+                                normalizeText(
+                                    data.nama
+                                )
+
+                        };
+
+                    })
                     .filter(Boolean);
 
+
+            /* =========================================
+               DURASI
+            ========================================= */
 
             let durasiMenit =
                 Number(
@@ -526,7 +574,6 @@ function bentukDataPlanning(
                     item.durasiMenit ??
                     0
                 );
-
 
             if (
                 !durasiMenit &&
@@ -547,10 +594,18 @@ function bentukDataPlanning(
             }
 
 
+            /* =========================================
+               ID PLANNING
+            ========================================= */
+
             const idPlanning =
                 item.kode_planning ??
                 String(item.id);
 
+
+            /* =========================================
+               RETURN
+            ========================================= */
 
             return {
 
@@ -576,8 +631,7 @@ function bentukDataPlanning(
                     item.jamSelesai ??
                     "",
 
-                durasiMenit:
-                    durasiMenit,
+                durasiMenit,
 
                 durasi:
                     item.durasi ??
@@ -614,8 +668,7 @@ function bentukDataPlanning(
 
 /* =====================================================
    LOAD SEMUA DATABASE
-   HANYA DIGUNAKAN SAAT INITIAL LOAD /
-   REFRESH MANUAL
+   INITIAL LOAD / REFRESH MANUAL
 ===================================================== */
 
 async function loadDatabase() {
@@ -626,7 +679,6 @@ async function loadDatabase() {
 
     }
 
-
     try {
 
         console.log(
@@ -635,12 +687,8 @@ async function loadDatabase() {
 
 
         /* =============================================
-           KARYAWAN
+           LOAD KARYAWAN
         ============================================= */
-
-        /*
-           Hanya SATU request karyawan.
-        */
 
         const {
             data: rawKaryawan,
@@ -665,59 +713,35 @@ async function loadDatabase() {
 
 
         karyawan =
-            Array.isArray(rawKaryawan)
-                ? rawKaryawan
-                    .map(item => {
-
-                        const normalized =
-                            normalisasiKaryawanData(
-                                [item]
-                            )[0];
-
-
-                        if (!normalized) {
-
-                            return null;
-
-                        }
-
-
-                        normalized.databaseId =
-                            item.id;
-
-                        normalized.idDatabase =
-                            item.id;
-
-
-                        return normalized;
-
-                    })
-                    .filter(Boolean)
-                : [];
-
+            normalisasiKaryawanDatabase(
+                rawKaryawan
+            );
 
         window.karyawan =
             karyawan;
 
 
         databaseKaryawanSnapshot =
-            cloneData(karyawan);
+            cloneData(
+                karyawan
+            );
 
 
         /* =============================================
-           PLANNING
+           LOAD PLANNING + RELASI
+           
+           Keduanya independen setelah karyawan
+           selesai dimuat.
         ============================================= */
 
-        const dataPlanning =
-            await loadPlanningSupabase();
-
-
-        /* =============================================
-           RELASI
-        ============================================= */
-
-        const dataRelasi =
-            await loadRelasiPlanningSupabase();
+        const [
+            dataPlanning,
+            dataRelasi
+        ] =
+            await Promise.all([
+                loadPlanningSupabase(),
+                loadRelasiPlanningSupabase()
+            ]);
 
 
         /* =============================================
@@ -731,13 +755,14 @@ async function loadDatabase() {
                 karyawan
             );
 
-
         window.planning =
             planning;
 
 
         databasePlanningSnapshot =
-            cloneData(planning);
+            cloneData(
+                planning
+            );
 
 
         /* =============================================
@@ -762,12 +787,10 @@ async function loadDatabase() {
             "Supabase database ready."
         );
 
-
         console.log(
             "Karyawan:",
             karyawan.length
         );
-
 
         console.log(
             "Planning:",
@@ -783,30 +806,25 @@ async function loadDatabase() {
         databaseReady =
             false;
 
-
         console.error(
             "DATABASE ERROR:",
             error
         );
-
 
         console.error(
             "MESSAGE:",
             error?.message
         );
 
-
         console.error(
             "DETAIL:",
             error?.details
         );
 
-
         console.error(
             "HINT:",
             error?.hint
         );
-
 
         return false;
 
@@ -886,7 +904,7 @@ function refreshUI() {
 
 function getKaryawan() {
 
-    return Array.isArray(karyawan)
+    return isArray(karyawan)
         ? karyawan
         : [];
 
@@ -895,7 +913,7 @@ function getKaryawan() {
 
 function getPlanning() {
 
-    return Array.isArray(planning)
+    return isArray(planning)
         ? planning
         : [];
 
@@ -909,25 +927,18 @@ function getPlanning() {
 function getKaryawanAktifDatabase() {
 
     return getKaryawan()
-        .filter(item => {
-
-            return (
-                String(
-                    item.status ??
-                    "AKTIF"
-                )
-                .trim()
-                .toUpperCase() ===
-                "AKTIF"
-            );
-
-        });
+        .filter(item =>
+            normalizeStatus(
+                item.status
+            ) === "AKTIF"
+        );
 
 }
 
 
 /* =====================================================
-   SIMPAN KARYAWAN - OPTIMIZED
+   SIMPAN KARYAWAN
+   OPTIMIZED
 ===================================================== */
 
 async function simpanKaryawanSupabase() {
@@ -938,179 +949,176 @@ async function simpanKaryawanSupabase() {
 
     }
 
-
     try {
 
         const current =
             getKaryawan();
 
-
         const oldSnapshot =
-            Array.isArray(
+            isArray(
                 databaseKaryawanSnapshot
             )
                 ? databaseKaryawanSnapshot
                 : [];
 
 
-        /*
-           Buat map data lama
-           supaya tidak perlu .find()
-           berulang-ulang.
-        */
+        /* =============================================
+           MAP DATA LAMA
+        ============================================= */
 
         const oldMap =
             new Map();
 
+        for (
+            const item of oldSnapshot
+        ) {
 
-        oldSnapshot.forEach(
-            item => {
+            oldMap.set(
+                normalizeId(item.id),
+                item
+            );
 
-                oldMap.set(
-                    normalizeId(item.id),
-                    item
-                );
+        }
 
-            }
-        );
 
+        /* =============================================
+           MAP DATA SEKARANG
+        ============================================= */
 
         const currentMap =
             new Map();
 
+        for (
+            const item of current
+        ) {
 
-        current.forEach(
-            item => {
+            currentMap.set(
+                normalizeId(item.id),
+                item
+            );
 
-                currentMap.set(
-                    normalizeId(item.id),
-                    item
-                );
-
-            }
-        );
+        }
 
 
-        /*
-           INSERT / UPDATE hanya data
-           yang berubah.
-        */
+        /* =============================================
+           CARI INSERT / UPDATE
+        ============================================= */
 
         const changedData = [];
 
 
-        current.forEach(
-            item => {
+        for (
+            const item of current
+        ) {
 
-                const id =
-                    normalizeId(item.id);
+            const id =
+                normalizeId(
+                    item.id
+                );
 
+            const nama =
+                normalizeText(
+                    item.nama
+                );
 
-                if (!id || !item.nama) {
+            if (
+                !id ||
+                !nama
+            ) {
 
-                    return;
-
-                }
-
-
-                const old =
-                    oldMap.get(id);
-
-
-                const currentData = {
-
-                    kode_karyawan:
-                        id,
-
-                    nama:
-                        String(
-                            item.nama ?? ""
-                        ).trim(),
-
-                    status:
-                        String(
-                            item.status ??
-                            "AKTIF"
-                        )
-                        .trim()
-                        .toUpperCase(),
-
-                    alasan_penalti:
-                        String(
-                            item.alasanPenalti ??
-                            item.alasan_penalti ??
-                            ""
-                        ).trim()
-
-                };
-
-
-                /*
-                   Data baru
-                */
-
-                if (!old) {
-
-                    changedData.push(
-                        currentData
-                    );
-
-                    return;
-
-                }
-
-
-                /*
-                   Data berubah
-                */
-
-                const oldNama =
-                    String(
-                        old.nama ?? ""
-                    ).trim();
-
-
-                const oldStatus =
-                    String(
-                        old.status ??
-                        "AKTIF"
-                    )
-                    .trim()
-                    .toUpperCase();
-
-
-                const oldAlasan =
-                    String(
-                        old.alasanPenalti ??
-                        ""
-                    ).trim();
-
-
-                if (
-                    oldNama !==
-                    currentData.nama ||
-
-                    oldStatus !==
-                    currentData.status ||
-
-                    oldAlasan !==
-                    currentData.alasan_penalti
-                ) {
-
-                    changedData.push(
-                        currentData
-                    );
-
-                }
+                continue;
 
             }
-        );
 
 
-        /*
-           Kalau ada data berubah,
-           kirim hanya data tersebut.
-        */
+            const old =
+                oldMap.get(id);
+
+
+            const currentData = {
+
+                kode_karyawan:
+                    id,
+
+                nama,
+
+                status:
+                    normalizeStatus(
+                        item.status
+                    ),
+
+                alasan_penalti:
+                    normalizeText(
+                        item.alasanPenalti ??
+                        item.alasan_penalti
+                    )
+
+            };
+
+
+            /* =========================================
+               DATA BARU
+            ========================================= */
+
+            if (!old) {
+
+                changedData.push(
+                    currentData
+                );
+
+                continue;
+
+            }
+
+
+            /* =========================================
+               DATA LAMA
+            ========================================= */
+
+            const oldNama =
+                normalizeText(
+                    old.nama
+                );
+
+            const oldStatus =
+                normalizeStatus(
+                    old.status
+                );
+
+            const oldAlasan =
+                normalizeText(
+                    old.alasanPenalti ??
+                    old.alasan_penalti
+                );
+
+
+            /* =========================================
+               CEK PERUBAHAN
+            ========================================= */
+
+            if (
+                oldNama !==
+                currentData.nama ||
+
+                oldStatus !==
+                currentData.status ||
+
+                oldAlasan !==
+                currentData.alasan_penalti
+            ) {
+
+                changedData.push(
+                    currentData
+                );
+
+            }
+
+        }
+
+
+        /* =============================================
+           UPSERT YANG BERUBAH SAJA
+        ============================================= */
 
         if (
             changedData.length > 0
@@ -1139,9 +1147,9 @@ async function simpanKaryawanSupabase() {
         }
 
 
-        /*
-           Cari data yang dihapus.
-        */
+        /* =============================================
+           CARI DATA YANG DIHAPUS
+        ============================================= */
 
         const deleted =
             oldSnapshot.filter(
@@ -1152,7 +1160,6 @@ async function simpanKaryawanSupabase() {
                             oldItem.id
                         );
 
-
                     return (
                         id &&
                         !currentMap.has(id)
@@ -1162,45 +1169,56 @@ async function simpanKaryawanSupabase() {
             );
 
 
-        /*
-           Hapus data satu per satu.
-           Biasanya jumlahnya hanya 1.
-        */
+        /* =============================================
+           HAPUS DATA
+        ============================================= */
 
-        for (
-            const item of deleted
+        if (
+            deleted.length > 0
         ) {
 
-            const id =
-                normalizeId(
-                    item.id
-                );
+            for (
+                const item of deleted
+            ) {
 
-
-            const {
-                error
-            } =
-                await supabaseClient
-                    .from("karyawan")
-                    .delete()
-                    .eq(
-                        "kode_karyawan",
-                        id
+                const id =
+                    normalizeId(
+                        item.id
                     );
 
+                if (!id) {
 
-            if (error) {
+                    continue;
 
-                throw error;
+                }
+
+
+                const {
+                    error
+                } =
+                    await supabaseClient
+                        .from("karyawan")
+                        .delete()
+                        .eq(
+                            "kode_karyawan",
+                            id
+                        );
+
+
+                if (error) {
+
+                    throw error;
+
+                }
 
             }
 
         }
 
 
-        /*
-           Update snapshot lokal.
-        */
+        /* =============================================
+           UPDATE SNAPSHOT
+        ============================================= */
 
         databaseKaryawanSnapshot =
             cloneData(
@@ -1218,7 +1236,6 @@ async function simpanKaryawanSupabase() {
             error
         );
 
-
         alert(
             "Karyawan gagal disimpan ke Supabase.\n\n" +
             (
@@ -1226,7 +1243,6 @@ async function simpanKaryawanSupabase() {
                 "Unknown error"
             )
         );
-
 
         return false;
 
@@ -1236,7 +1252,8 @@ async function simpanKaryawanSupabase() {
 
 
 /* =====================================================
-   SIMPAN PENALTI - OPTIMIZED
+   SIMPAN PENALTI
+   OPTIMIZED
 ===================================================== */
 
 async function simpanPenaltiSupabase() {
@@ -1247,99 +1264,108 @@ async function simpanPenaltiSupabase() {
 
     }
 
-
     try {
-
-        /*
-           Hanya cari karyawan yang berubah
-           berdasarkan snapshot.
-        */
 
         const current =
             getKaryawan();
 
-
         const old =
-            Array.isArray(
+            isArray(
                 databaseKaryawanSnapshot
             )
                 ? databaseKaryawanSnapshot
                 : [];
 
 
+        /* =============================================
+           MAP SNAPSHOT
+        ============================================= */
+
         const oldMap =
             new Map();
 
+        for (
+            const item of old
+        ) {
 
-        old.forEach(
-            item => {
+            oldMap.set(
+                normalizeId(item.id),
+                item
+            );
 
-                oldMap.set(
-                    normalizeId(item.id),
+        }
+
+
+        /* =============================================
+           CARI DATA PENALTI BERUBAH
+        ============================================= */
+
+        const changed = [];
+
+
+        for (
+            const item of current
+        ) {
+
+            const id =
+                normalizeId(
+                    item.id
+                );
+
+            const previous =
+                oldMap.get(id);
+
+
+            if (!previous) {
+
+                continue;
+
+            }
+
+
+            const currentStatus =
+                normalizeStatus(
+                    item.status
+                );
+
+            const oldStatus =
+                normalizeStatus(
+                    previous.status
+                );
+
+            const currentAlasan =
+                normalizeText(
+                    item.alasanPenalti ??
+                    item.alasan_penalti
+                );
+
+            const oldAlasan =
+                normalizeText(
+                    previous.alasanPenalti ??
+                    previous.alasan_penalti
+                );
+
+
+            if (
+                oldStatus !==
+                currentStatus ||
+
+                oldAlasan !==
+                currentAlasan
+            ) {
+
+                changed.push(
                     item
                 );
 
             }
-        );
+
+        }
 
 
-        const changed =
-            current.filter(
-                item => {
-
-                    const id =
-                        normalizeId(
-                            item.id
-                        );
-
-
-                    const previous =
-                        oldMap.get(id);
-
-
-                    if (!previous) {
-
-                        return false;
-
-                    }
-
-
-                    return (
-
-                        String(
-                            previous.status ??
-                            "AKTIF"
-                        )
-                        .trim()
-                        .toUpperCase() !==
-
-                        String(
-                            item.status ??
-                            "AKTIF"
-                        )
-                        .trim()
-                        .toUpperCase()
-
-                    ) ||
-
-                    String(
-                        previous.alasanPenalti ??
-                        ""
-                    ).trim() !==
-
-                    String(
-                        item.alasanPenalti ??
-                        ""
-                    ).trim();
-
-                }
-            );
-
-
-        /*
-           Tidak ada perubahan penalti.
-           Tidak perlu request apa pun.
-        */
+        /* =============================================
+           TIDAK ADA PERUBAHAN
+        ============================================= */
 
         if (
             changed.length === 0
@@ -1350,18 +1376,28 @@ async function simpanPenaltiSupabase() {
         }
 
 
-        /*
-           Ambil ID database hanya
-           untuk karyawan yang berubah.
-        */
+        /* =============================================
+           AMBIL DATABASE ID
+           DALAM SATU QUERY
+        ============================================= */
 
         const kodeList =
-            changed.map(
-                item =>
+            changed
+                .map(item =>
                     normalizeId(
                         item.id
                     )
-            );
+                )
+                .filter(Boolean);
+
+
+        if (
+            kodeList.length === 0
+        ) {
+
+            return true;
+
+        }
 
 
         const {
@@ -1386,45 +1422,46 @@ async function simpanPenaltiSupabase() {
         }
 
 
-        if (!Array.isArray(data)) {
+        if (!isArray(data)) {
 
             return true;
 
         }
 
 
+        /* =============================================
+           MAP DATABASE ID
+        ============================================= */
+
         const databaseMap =
             new Map();
 
+        for (
+            const item of data
+        ) {
 
-        data.forEach(
-            item => {
+            databaseMap.set(
+                normalizeId(
+                    item.kode_karyawan
+                ),
+                item.id
+            );
 
-                databaseMap.set(
-                    normalizeId(
-                        item.kode_karyawan
-                    ),
-                    item.id
-                );
-
-            }
-        );
+        }
 
 
-        /*
-           Proses penalti yang berubah saja.
-        */
+        /* =============================================
+           PROSES PENALTI
+        ============================================= */
 
         for (
-            const aplikasi
-            of changed
+            const aplikasi of changed
         ) {
 
             const kode =
                 normalizeId(
                     aplikasi.id
                 );
-
 
             const databaseId =
                 databaseMap.get(
@@ -1440,24 +1477,20 @@ async function simpanPenaltiSupabase() {
 
 
             const status =
-                String(
-                    aplikasi.status ??
-                    "AKTIF"
-                )
-                .trim()
-                .toUpperCase();
-
+                normalizeStatus(
+                    aplikasi.status
+                );
 
             const alasan =
-                String(
+                normalizeText(
                     aplikasi.alasanPenalti ??
-                    ""
-                ).trim();
+                    aplikasi.alasan_penalti
+                );
 
 
-            /*
+            /* =========================================
                PENALTI
-            */
+            ========================================= */
 
             if (
                 status ===
@@ -1492,9 +1525,7 @@ async function simpanPenaltiSupabase() {
 
 
                 if (
-                    Array.isArray(
-                        penaltyAktif
-                    ) &&
+                    isArray(penaltyAktif) &&
                     penaltyAktif.length > 0
                 ) {
 
@@ -1563,9 +1594,10 @@ async function simpanPenaltiSupabase() {
 
             }
 
-            /*
+
+            /* =========================================
                LEPAS PENALTI
-            */
+            ========================================= */
 
             else {
 
@@ -1612,7 +1644,6 @@ async function simpanPenaltiSupabase() {
             error
         );
 
-
         alert(
             "Data penalti gagal disimpan ke Supabase.\n\n" +
             (
@@ -1620,7 +1651,6 @@ async function simpanPenaltiSupabase() {
                 "Unknown error"
             )
         );
-
 
         return false;
 
@@ -1642,33 +1672,37 @@ async function simpanPlanningSupabase() {
 
     }
 
-
     try {
 
         const currentPlanning =
             getPlanning();
 
 
+        /* =============================================
+           SET ID PLANNING SEKARANG
+           Lebih cepat daripada includes()
+        ============================================= */
+
         const currentPlanningIds =
-            currentPlanning
-                .map(
-                    item =>
+            new Set(
+                currentPlanning
+                    .map(item =>
                         String(
                             item.idPlanning ??
                             item.id ??
                             ""
                         ).trim()
-                )
-                .filter(Boolean);
+                    )
+                    .filter(Boolean)
+            );
 
 
-        /*
-           Proses planning satu per satu
-        */
+        /* =============================================
+           PROSES PLANNING
+        ============================================= */
 
         for (
-            const item
-            of currentPlanning
+            const item of currentPlanning
         ) {
 
             const kodePlanning =
@@ -1685,6 +1719,10 @@ async function simpanPlanningSupabase() {
 
             }
 
+
+            /* =========================================
+               UPSERT PLANNING
+            ========================================= */
 
             const {
                 data:
@@ -1757,9 +1795,9 @@ async function simpanPlanningSupabase() {
                 planningData.id;
 
 
-            /*
-               Hapus relasi lama
-            */
+            /* =========================================
+               HAPUS RELASI LAMA
+            ========================================= */
 
             const {
                 error:
@@ -1783,23 +1821,15 @@ async function simpanPlanningSupabase() {
             }
 
 
-            /*
-               Ambil daftar karyawan
-            */
+            /* =========================================
+               DAFTAR KARYAWAN
+            ========================================= */
 
             const daftar =
-                Array.isArray(
-                    item.karyawan
-                )
+                isArray(item.karyawan)
                     ? item.karyawan
                     : [];
 
-
-            /*
-               OPTIMASI:
-               Ambil semua ID karyawan
-               dalam SATU query.
-            */
 
             const kodeKaryawanList =
                 daftar
@@ -1820,6 +1850,11 @@ async function simpanPlanningSupabase() {
 
             }
 
+
+            /* =========================================
+               AMBIL ID KARYAWAN
+               SATU QUERY
+            ========================================= */
 
             const {
                 data:
@@ -1845,77 +1880,76 @@ async function simpanPlanningSupabase() {
             }
 
 
+            /* =========================================
+               MAP KARYAWAN
+            ========================================= */
+
             const databaseKaryawanMap =
                 new Map();
 
 
-            if (
-                Array.isArray(
-                    karyawanDB
-                )
-            ) {
+            if (isArray(karyawanDB)) {
 
-                karyawanDB.forEach(
-                    itemDB => {
+                for (
+                    const itemDB of karyawanDB
+                ) {
 
-                        databaseKaryawanMap.set(
-                            normalizeId(
-                                itemDB.kode_karyawan
-                            ),
-                            itemDB.id
-                        );
+                    databaseKaryawanMap.set(
+                        normalizeId(
+                            itemDB.kode_karyawan
+                        ),
+                        itemDB.id
+                    );
 
-                    }
-                );
+                }
 
             }
 
 
-            /*
-               Buat semua relasi sekaligus.
-            */
+            /* =========================================
+               BUAT RELASI
+            ========================================= */
 
             const relationInsert =
                 kodeKaryawanList
-                    .map(
-                        kode => {
+                
+                    .map(kode => {
 
-                            const databaseId =
-                                databaseKaryawanMap.get(
-                                    kode
-                                );
-
-
-                            if (!databaseId) {
-
-                                console.warn(
-                                    "Karyawan tidak ditemukan:",
-                                    kode
-                                );
-
-                                return null;
-
-                            }
+                        const databaseId =
+                            databaseKaryawanMap.get(
+                                kode
+                            );
 
 
-                            return {
+                        if (!databaseId) {
 
-                                planning_id:
-                                    planningId,
+                            console.warn(
+                                "Karyawan tidak ditemukan:",
+                                kode
+                            );
 
-                                karyawan_id:
-                                    databaseId
-
-                            };
+                            return null;
 
                         }
-                    )
+
+
+                        return {
+
+                            planning_id:
+                                planningId,
+
+                            karyawan_id:
+                                databaseId
+
+                        };
+
+                    })
                     .filter(Boolean);
 
 
-            /*
+            /* =========================================
                INSERT RELASI SEKALIGUS
-            */
+            ========================================= */
 
             if (
                 relationInsert.length > 0
@@ -1945,37 +1979,38 @@ async function simpanPlanningSupabase() {
         }
 
 
-        /*
-           HAPUS PLANNING
-        */
+        /* =============================================
+           HAPUS PLANNING YANG SUDAH DIHAPUS LOKAL
+        ============================================= */
 
         const deletedPlanning =
             databasePlanningSnapshot
-                .filter(
-                    oldItem => {
+                .filter(oldItem => {
 
-                        const oldId =
-                            String(
-                                oldItem.idPlanning ??
-                                oldItem.id ??
-                                ""
-                            ).trim();
+                    const oldId =
+                        String(
+                            oldItem.idPlanning ??
+                            oldItem.id ??
+                            ""
+                        ).trim();
 
 
-                        return (
-                            oldId &&
-                            !currentPlanningIds.includes(
-                                oldId
-                            )
-                        );
+                    return (
+                        oldId &&
+                        !currentPlanningIds.has(
+                            oldId
+                        )
+                    );
 
-                    }
-                );
+                });
 
+
+        /* =============================================
+           HAPUS DATABASE
+        ============================================= */
 
         for (
-            const item
-            of deletedPlanning
+            const item of deletedPlanning
         ) {
 
             const kode =
@@ -2019,9 +2054,9 @@ async function simpanPlanningSupabase() {
         }
 
 
-        /*
-           Update snapshot
-        */
+        /* =============================================
+           UPDATE SNAPSHOT
+        ============================================= */
 
         databasePlanningSnapshot =
             cloneData(
@@ -2039,7 +2074,6 @@ async function simpanPlanningSupabase() {
             error
         );
 
-
         alert(
             "Planning gagal disimpan ke Supabase.\n\n" +
             (
@@ -2047,7 +2081,6 @@ async function simpanPlanningSupabase() {
                 "Unknown error"
             )
         );
-
 
         return false;
 
@@ -2057,7 +2090,8 @@ async function simpanPlanningSupabase() {
 
 
 /* =====================================================
-   SIMPAN SEMUA DATA - OPTIMIZED
+   SIMPAN SEMUA DATA
+   OPTIMIZED
 ===================================================== */
 
 async function simpanData() {
@@ -2078,9 +2112,9 @@ async function simpanData() {
     );
 
 
-    /*
-       Simpan karyawan yang berubah saja.
-    */
+    /* =============================================
+       SIMPAN KARYAWAN
+    ============================================= */
 
     const karyawanBerhasil =
         await simpanKaryawanSupabase();
@@ -2093,9 +2127,9 @@ async function simpanData() {
     }
 
 
-    /*
-       Simpan penalti yang berubah saja.
-    */
+    /* =============================================
+       SIMPAN PENALTI
+    ============================================= */
 
     const penaltiBerhasil =
         await simpanPenaltiSupabase();
@@ -2108,10 +2142,9 @@ async function simpanData() {
     }
 
 
-    /*
-       Planning tetap diproses.
-       Namun tidak reload database setelahnya.
-    */
+    /* =============================================
+       SIMPAN PLANNING
+    ============================================= */
 
     const planningBerhasil =
         await simpanPlanningSupabase();
@@ -2124,29 +2157,19 @@ async function simpanData() {
     }
 
 
-    /*
-       Snapshot lokal sudah diperbarui.
-    */
+    /* =============================================
+       UPDATE SNAPSHOT
+    ============================================= */
 
     databaseKaryawanSnapshot =
         cloneData(
             getKaryawan()
         );
 
-
     databasePlanningSnapshot =
         cloneData(
             getPlanning()
         );
-
-
-    /*
-       TIDAK ADA:
-       await loadDatabase();
-
-       Jadi setelah CRUD tidak
-       mengambil seluruh database lagi.
-    */
 
 
     console.log(
@@ -2187,7 +2210,6 @@ function normalisasiDatabase() {
         normalisasiKaryawanData(
             karyawan
         );
-
 
     window.karyawan =
         karyawan;
@@ -2286,7 +2308,6 @@ window.tungguDatabaseReady =
 
 databaseReadyPromise =
     loadDatabase();
-
 
 window.databaseReadyPromise =
     databaseReadyPromise;
