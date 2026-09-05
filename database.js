@@ -993,6 +993,17 @@ async function loadDatabase() {
             error?.hint
         );
 
+        document.dispatchEvent(
+            new CustomEvent(
+                "databaseError",
+                {
+                    detail: error
+                }
+            )
+        );
+
+        refreshUI();
+
         return false;
 
     }

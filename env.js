@@ -10,16 +10,24 @@
     const placeholderUrl = "__SUPABASE_URL__";
     const placeholderAnonKey = "__SUPABASE_ANON_KEY__";
 
-    const url = String(
+    let url = String(
         source.SUPABASE_URL ||
         source.API_BASE_URL ||
-        placeholderUrl
-    ).replace(/\/$/, "");
+        ""
+    ).trim().replace(/\/$/, "");
 
-    const anonKey = String(
+    let anonKey = String(
         source.SUPABASE_ANON_KEY ||
-        placeholderAnonKey
+        ""
     ).trim();
+
+    // Jika masih berupa placeholder, kosongkan agar tidak memicu error URL invalid
+    if (url === placeholderUrl || url.includes("__SUPABASE_URL__")) {
+        url = "";
+    }
+    if (anonKey === placeholderAnonKey || anonKey.includes("__SUPABASE_ANON_KEY__")) {
+        anonKey = "";
+    }
 
     const env = {
         SUPABASE_URL: url,
