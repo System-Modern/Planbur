@@ -1,10 +1,11 @@
-# Local environment files
+# Server-only environment files
 .env
 .env.*
 !.env.example
 
+# Browser runtime configuration & local overrides
+env.js
+config.local.js
+
 # Generated runtime configuration
 .env.generated.js
-
-# Local developer-only override, keep actual values off GitHub
-config.local.js
